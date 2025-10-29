@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid h-100">
+    <div class="row h-100">
+        <!-- Sidebar - File Explorer -->
+        <div class="col-md-3 bg-dark border-end border-secondary" id="file-explorer">
+            <div class="p-3">
+                <button class="btn btn-primary w-100 mb-3" id="open-project-btn">
+                    <i class="bi bi-folder-open me-2"></i>Open Project
+                </button>
+                <div id="file-tree" class="text-light">
+                    <div class="text-muted">No project loaded</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Editor Area -->
+        <div class="col-md-9 bg-dark">
+            <div class="h-100 d-flex flex-column">
+                <div class="p-3 border-bottom border-secondary">
+                    <ul class="nav nav-tabs border-bottom-0" id="editor-tabs">
+                        <li class="nav-item">
+                            <a class="nav-link active text-light" href="#welcome" data-bs-toggle="tab">Welcome</a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="tab-content flex-grow-1" id="editor-content">
+                    <div class="tab-pane fade show active h-100" id="welcome">
+                        <div class="d-flex align-items-center justify-content-center h-100">
+                            <div class="text-center text-light">
+                                <i class="bi bi-atom display-1 mb-3 text-warning"></i>
+                                <h3>Hitler Particle Accelerator</h3>
+                                <p class="mb-1">HOI4 Mod Editor</p>
+                                <small class="text-muted">Click "Open Project" to load a HOI4 mod folder</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+body {
+    background-color: #1a1a1a;
+    color: #e9ecef;
+    height: 100vh;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+#file-explorer {
+    height: 100vh;
+    overflow-y: auto;
+}
+
+#file-tree {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.file-item, .folder-item {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-item:hover, .folder-item:hover {
+    background-color: #2d3748;
+}
+
+.folder-contents {
+    margin-left: 10px;
+}
+
+.nav-tabs .nav-link {
+    color: #adb5bd;
+}
+
+.nav-tabs .nav-link.active {
+    color: #fff;
+    background-color: #495057;
+    border-color: #495057;
+}
+
+/* Scrollbar styling */
+#file-explorer::-webkit-scrollbar {
+    width: 8px;
+}
+
+#file-explorer::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+#file-explorer::-webkit-scrollbar-thumb {
+    background: #495057;
+    border-radius: 4px;
+}
+
+#file-explorer::-webkit-scrollbar-thumb:hover {
+    background: #6c757d;
+}
+
+/* Editor area */
+#editor-content {
+    height: calc(100vh - 120px);
+    overflow-y: auto;
+}
+
+.tab-pane {
+    height: 100%;
+}
+
+.tab-pane textarea {
+    height: 100%;
+    min-height: 500px;
+}
+/* Focus Editor Styles */
+.focus-node {
+    user-select: none;
+    border: 2px solid #0d6efd;
+    transition: all 0.2s;
+}
+
+.focus-node:hover {
+    border-color: #0dcaf0;
+    transform: scale(1.05);
+}
+
+#focus-canvas {
+    background: 
+        linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+    overflow: hidden;
+    cursor: grab;
+}
+
+#focus-canvas:active {
+    cursor: grabbing;
+}
