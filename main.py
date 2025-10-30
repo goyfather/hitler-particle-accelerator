@@ -21,24 +21,23 @@ try:
     import time
 except ImportError as e:
     print(f"Import error: {e}")
-    print("Please run launch.bat first to install dependencies")
+    print("Please run start.bat first to install dependencies")
     input("Press Enter to exit...")
     sys.exit(1)
 
 def open_browser():
+    if getattr(open_browser, 'launched', False):
+        return
     """Wait a moment for the server to start, then open the browser"""
     time.sleep(1.5)
     webbrowser.open('http://127.0.0.1:5000/')
 
 
-launchedBrowser = 0
 if __name__ == '__main__':
     print("Starting Hitler Particle Accelerator...")
     
-    # Start browser in a separate thread
-    if launchedBrowser == 0:
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         threading.Thread(target=open_browser).start()
-        launchedBrowser = 1
     
     # Create and run the app
     app = create_app()
