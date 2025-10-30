@@ -1,6 +1,11 @@
 from flask import Blueprint, render_template, request, jsonify
 import os
 import json
+import sys
+
+# Add the editors directory to the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from editors.country_editor import CountryCreator
 
 main = Blueprint('main', __name__)
 
@@ -148,6 +153,41 @@ def create_focus_tree():
         return jsonify({'success': True, 'message': f'Focus tree {name} created successfully!'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/create_country', methods=['POST'])
+def create_country():
+    """Create a new country using the CountryCreator class"""
+    if not project_manager.current_project:
+        return jsonify({'success': False, 'message': 'No project loaded'})
+    
+    data = request.get_json()
+    tag = data.get('tag', '').strip()
+    name = data.get('name', '').strip()
+    color_hex = data.get('color', '#3d85c6').strip()
+    graphical_culture = data.get('graphical_culture', 'western_european_gfx')
+    graphical_culture_2d = data.get('graphical_culture_2d', 'western_european_2d')
+    
+    if not tag or not name:
+        return jsonify({'success': False, 'message': 'Tag and name are required'})
+    
+    # Initialize country creator
+    country_creator = CountryCreator(project_manager.current_project)
+    
+    # Validate and convert color
+    color_rgb = country_creator.validate_color(color_hex)
+    if not color_rgb:
+        return jsonify({'success': False, 'message': 'Invalid color format'})
+    
+    # Create the country
+    success, message = country_creator.create_country(
+        tag=tag,
+        name=name,
+        color=color_rgb,
+        graphical_culture=graphical_culture,
+        graphical_culture_2d=graphical_culture_2d
+    )
+    
+    return jsonify({'success': success, 'message': message})
 
 @main.route('/api/save_file', methods=['POST'])
 def save_file():
