@@ -124,7 +124,9 @@ class StateEditor:
         color_map = {}
         for prov_id, data in self.provinces.items():
             color_key = (data['r'], data['g'], data['b'])
-            color_map[color_key] = prov_id
+            # Convert tuple to string key for JSON serialization
+            color_key_str = f"{color_key[0]},{color_key[1]},{color_key[2]}"
+            color_map[color_key_str] = prov_id
         return color_map
     
     def parse_state_file(self, filepath):
@@ -315,6 +317,167 @@ class StateEditor:
             return True, "State saved successfully"
         except Exception as e:
             return False, f"Error saving state: {str(e)}"
+
+    def get_province_outlines(self):
+        outlines = {}    
+        for province_id, province_data in self.provinces.items():
+            # For now, return basic province data - we'll enhance this later
+            outlines[province_id] = {
+                'type': province_data['type'],
+                'color': [province_data['r'], province_data['g'], province_data['b']],
+                'state_id': self.province_to_state.get(province_id)
+            }
+        
+        return outlines
+    def get_province_outlines_vector(self):
+        """Extract province outlines as vector paths from the provinces image"""
+        import numpy as np
+        from PIL import Image, ImageDraw
+        
+        success, img = self.load_provinces_image()
+        if not success:
+            return {}
+        
+        # Convert to numpy array for processing
+        img_array = np.array(img)
+        height, width = img_array.shape[:2]
+        
+        outlines = {}
+        
+        # For each province, find its boundary
+        for province_id, province_data in self.provinces.items():
+            color = (province_data['r'], province_data['g'], province_data['b'])
+            
+            # Create a mask for this province
+            mask = np.all(img_array == color, axis=2)
+            
+            if not np.any(mask):
+                continue
+                
+            # Find the bounding box of the province
+            rows = np.any(mask, axis=1)
+            cols = np.any(mask, axis=0)
+            ymin, ymax = np.where(rows)[0][[0, -1]]
+            xmin, xmax = np.where(cols)[0][[0, -1]]
+            
+            # Extract the province region
+            province_region = mask[ymin:ymax+1, xmin:xmax+1]
+            
+            # Find the outline using edge detection
+            outline_points = self.trace_province_outline(province_region, xmin, ymin)
+            
+            if outline_points:
+                outlines[province_id] = {
+                    'points': outline_points,
+                    'bounds': [xmin, ymin, xmax, ymax],
+                    'type': province_data['type']
+                }
+        
+        return outlines
+
+    def trace_province_outline(self, region, offset_x, offset_y):
+        """Trace the outline of a province region using Moore-Neighbor tracing"""
+        try:
+            # Find a starting point on the edge
+            height, width = region.shape
+            points = []
+            
+            # Simple approach: find the first white pixel and trace around it
+            for y in range(height):
+                for x in range(width):
+                    if region[y, x]:
+                        # Found a pixel, now trace the boundary
+                        return self.moore_neighbor_trace(region, x, y, offset_x, offset_y)
+            
+            return []
+        except Exception as e:
+            print(f"Error tracing outline: {e}")
+            return []
+
+    def moore_neighbor_trace(self, region, start_x, start_y, offset_x, offset_y):
+        """Moore-Neighbor boundary tracing algorithm"""
+        # Directions: right, down, left, up, and diagonals
+        directions = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
+        
+        points = []
+        current = (start_x, start_y)
+        first = current
+        previous_direction = 0
+        
+        while True:
+            points.append((current[0] + offset_x, current[1] + offset_y))
+            
+            # Look for the next boundary pixel
+            found = False
+            for i in range(8):
+                direction = (previous_direction + i) % 8
+                dx, dy = directions[direction]
+                nx, ny = current[0] + dx, current[1] + dy
+                
+                # Check if this neighbor is within bounds and is part of the province
+                if (0 <= nx < region.shape[1] and 0 <= ny < region.shape[0] and 
+                    region[ny, nx]):
+                    current = (nx, ny)
+                    previous_direction = (direction + 5) % 8  # Back 2 steps in clockwise order
+                    found = True
+                    break
+            
+            if not found:
+                break
+                
+            # Stop if we've returned to start
+            if current == first and len(points) > 1:
+                break
+                
+            # Prevent infinite loops
+            if len(points) > 10000:
+                break
+        
+        return points
+
+    def find_province_edges(self):
+        """Find edges between provinces for vector borders"""
+        # This is a placeholder - in a real implementation, you'd use
+        # image processing to trace province boundaries
+        edges = []
+        
+        # Simple edge detection between provinces
+        success, img = self.load_provinces_image()
+        if not success:
+            return edges
+        
+        width, height = img.size
+        pixels = img.load()
+        
+        for y in range(1, height - 1):
+            for x in range(1, width - 1):
+                current_color = pixels[x, y]
+                current_province = self.get_province_from_color(current_color)
+                
+                # Check neighbors
+                neighbors = [
+                    (x-1, y), (x+1, y), (x, y-1), (x, y+1)
+                ]
+                
+                for nx, ny in neighbors:
+                    if 0 <= nx < width and 0 <= ny < height:
+                        neighbor_color = pixels[nx, ny]
+                        neighbor_province = self.get_province_from_color(neighbor_color)
+                        
+                        if current_province != neighbor_province:
+                            edges.append({
+                                'x1': x, 'y1': y,
+                                'x2': nx, 'y2': ny,
+                                'province1': current_province,
+                                'province2': neighbor_province
+                            })
+        
+        return edges
+
+    def get_province_from_color(self, color):
+        """Get province ID from RGB color"""
+        color_key = f"{color[0]},{color[1]},{color[2]}"
+        return self.color_map.get(color_key)
     
     def save_all_states(self):
         """Save all modified states"""

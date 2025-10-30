@@ -1,151 +1,31 @@
 class FocusEditor {
     constructor(container, filePath, fileName) {
         console.log('FocusEditor constructor called');
-        console.log('Container:', container);
-        console.log('File path:', filePath);
-        console.log('File name:', fileName);
-        
         this.container = container;
         this.filePath = filePath;
         this.fileName = fileName;
         this.focusNodes = new Map();
         this.branches = new Map();
         this.selectedNodes = new Set();
-        this.clipboard = null;
-        this.validationErrors = new Map();
         this.nextFocusId = 1;
         this.gridSize = 80;
-        this.zoomLevel = 1;
-        this.panOffset = { x: 0, y: 0 };
-        this.isPanning = false;
-        this.lastMousePos = { x: 0, y: 0 };
         
-        console.log('FocusEditor properties initialized');
+        // Viewport controls
+        this.viewport = {
+            x: 0,
+            y: 0,
+            scale: 1.0
+        };
         
-        // Enhanced tree data
-        this.treeData = {
-            id: fileName.replace('.txt', ''),
-            country: { factor: 1 },
-            default: true,
-            reset_on_civilwar: false,
-            initial_show_position: null,
-            shared_focus: null,
-            search_filter_prios: {
-                FOCUS_FILTER_POLITICAL: 1010,
-                FOCUS_FILTER_RESEARCH: 522,
-                FOCUS_FILTER_INDUSTRY: 509,
-                FOCUS_FILTER_ARMY_XP: 103,
-                FOCUS_FILTER_NAVY_XP: 102,
-                FOCUS_FILTER_AIR_XP: 101,
-                FOCUS_FILTER_BALANCE_OF_POWER: 200
-            }
-        };
-
-        // Predefined focus templates
-        this.focusTemplates = {
-            basic: {
-                name: "Basic Focus",
-                cost: 10,
-                icon: "GFX_goal_generic_production",
-                search_filters: ["FOCUS_FILTER_RESEARCH"],
-                completion_reward: "add_political_power = 100"
-            },
-            army: {
-                name: "Army Focus",
-                cost: 10,
-                icon: "GFX_goal_generic_allies_build_infantry",
-                search_filters: ["FOCUS_FILTER_RESEARCH", "FOCUS_FILTER_ARMY_XP"],
-                completion_reward: "army_experience = 25"
-            },
-            navy: {
-                name: "Navy Focus", 
-                cost: 10,
-                icon: "GFX_goal_generic_build_navy",
-                search_filters: ["FOCUS_FILTER_RESEARCH", "FOCUS_FILTER_NAVY_XP"],
-                completion_reward: "navy_experience = 25"
-            },
-            air: {
-                name: "Air Focus",
-                cost: 10,
-                icon: "GFX_goal_generic_build_airforce", 
-                search_filters: ["FOCUS_FILTER_RESEARCH", "FOCUS_FILTER_AIR_XP"],
-                completion_reward: "air_experience = 25"
-            },
-            industry: {
-                name: "Industry Focus",
-                cost: 10,
-                icon: "GFX_goal_generic_production",
-                search_filters: ["FOCUS_FILTER_INDUSTRY"],
-                completion_reward: "add_extra_state_shared_building_slots = 1\nadd_building_construction = {\n    type = industrial_complex\n    level = 1\n    instant_build = yes\n}"
-            },
-            political: {
-                name: "Political Focus",
-                cost: 10,
-                icon: "GFX_goal_generic_demand_territory",
-                search_filters: ["FOCUS_FILTER_POLITICAL"],
-                completion_reward: "add_political_power = 150"
-            }
-        };
-
-        this.commonIcons = [
-            'GFX_goal_generic_allies_build_infantry',
-            'GFX_goal_generic_small_arms',
-            'GFX_goal_generic_army_motorized',
-            'GFX_goal_generic_army_doctrines',
-            'GFX_goal_generic_army_artillery',
-            'GFX_goal_generic_build_tank',
-            'GFX_goal_generic_army_tanks',
-            'GFX_goal_generic_special_forces',
-            'GFX_goal_generic_build_airforce',
-            'GFX_goal_generic_air_fighter',
-            'GFX_goal_generic_air_bomber',
-            'GFX_goal_generic_air_doctrine',
-            'GFX_goal_generic_CAS',
-            'GFX_focus_rocketry',
-            'GFX_goal_generic_air_naval_bomber',
-            'GFX_goal_generic_construct_naval_dockyard',
-            'GFX_goal_generic_build_navy',
-            'GFX_goal_generic_navy_doctrines_tactics',
-            'GFX_goal_generic_navy_submarine',
-            'GFX_goal_generic_navy_cruiser',
-            'GFX_goal_generic_wolf_pack',
-            'GFX_goal_generic_navy_battleship',
-            'GFX_goal_generic_production',
-            'GFX_goal_generic_construct_civ_factory',
-            'GFX_goal_generic_construct_mil_factory',
-            'GFX_goal_generic_construct_infrastructure',
-            'GFX_focus_wonderweapons',
-            'GFX_focus_research',
-            'GFX_goal_generic_secret_weapon',
-            'GFX_goal_generic_demand_territory',
-            'GFX_goal_generic_national_unity',
-            'GFX_goal_support_fascism',
-            'GFX_goal_support_communism',
-            'GFX_goal_support_democracy',
-            'GFX_goal_generic_political_pressure',
-            'GFX_goal_generic_dangerous_deal',
-            'GFX_goal_generic_neutrality_focus',
-            'GFX_goal_generic_more_territorial_claims',
-            'GFX_goal_generic_defence',
-            'GFX_goal_generic_military_sphere',
-            'GFX_goal_generic_propaganda',
-            'GFX_goal_generic_forceful_treaty',
-            'GFX_goal_generic_scientific_exchange'
-        ];
-
-        this.searchFilters = [
-            'FOCUS_FILTER_POLITICAL',
-            'FOCUS_FILTER_RESEARCH', 
-            'FOCUS_FILTER_INDUSTRY',
-            'FOCUS_FILTER_ARMY_XP',
-            'FOCUS_FILTER_NAVY_XP',
-            'FOCUS_FILTER_AIR_XP',
-            'FOCUS_FILTER_BALANCE_OF_POWER',
-            'FOCUS_FILTER_SOV_POLITICAL_PARANOIA',
-            'FOCUS_FILTER_PROPAGANDA',
-            'FOCUS_FILTER_MISSIOLINI'
-        ];
-
+        // Canvas dimensions (1000x1000 grid)
+        this.canvasWidth = 1000 * this.gridSize;
+        this.canvasHeight = 1000 * this.gridSize;
+        
+        // Drag state
+        this.isDragging = false;
+        this.dragStart = { x: 0, y: 0 };
+        this.viewportStart = { x: 0, y: 0 };
+        
         console.log('FocusEditor setup complete, calling init...');
         this.init();
     }
@@ -159,10 +39,6 @@ class FocusEditor {
             console.log('Render completed');
             this.setupEventListeners();
             console.log('Event listeners setup');
-            this.setupKeyboardShortcuts();
-            console.log('Keyboard shortcuts setup');
-            this.runValidation();
-            console.log('Validation completed');
             console.log('FocusEditor init finished successfully');
         } catch (error) {
             console.error('Error in FocusEditor init:', error);
@@ -200,62 +76,121 @@ class FocusEditor {
         this.focusNodes.clear();
         this.branches.clear();
         
-        // Simple parsing for demo - just create some nodes
-        console.log('Creating demo tree instead of parsing...');
-        this.createDemoTree();
+        // Simple parser for HOI4 focus tree format
+        const focusBlocks = content.match(/focus\s*=\s*\{[^}]+\}/g) || [];
+        
+        console.log(`Found ${focusBlocks.length} focus blocks`);
+        
+        focusBlocks.forEach(block => {
+            try {
+                const focus = this.parseFocusBlock(block);
+                if (focus) {
+                    this.focusNodes.set(focus.id, focus);
+                    
+                    // Add to branch
+                    if (!this.branches.has(focus.branch)) {
+                        this.branches.set(focus.branch, {
+                            name: focus.branch,
+                            nodes: new Set(),
+                            color: this.getBranchColor(focus.branch),
+                            collapsed: false
+                        });
+                    }
+                    this.branches.get(focus.branch).nodes.add(focus.id);
+                }
+            } catch (error) {
+                console.error('Error parsing focus block:', error);
+            }
+        });
+        
+        // If no focuses were parsed, create a default one
+        if (this.focusNodes.size === 0) {
+            console.log('No focuses parsed, creating default tree');
+            this.createDefaultTree();
+        } else {
+            console.log(`Successfully parsed ${this.focusNodes.size} focuses`);
+        }
     }
     
-    createDemoTree() {
-        console.log('Creating demo tree...');
+    parseFocusBlock(block) {
+        const focus = {
+            id: this.extractValue(block, 'id'),
+            x: parseInt(this.extractValue(block, 'x')) || 0,
+            y: parseInt(this.extractValue(block, 'y')) || 0,
+            cost: parseInt(this.extractValue(block, 'cost')) || 10,
+            icon: this.extractValue(block, 'icon') || 'GFX_goal_generic_production',
+            prerequisite: this.extractPrerequisite(block),
+            search_filters: this.extractSearchFilters(block),
+            completion_reward: this.extractCompletionReward(block),
+            branch: 'General', // Default branch
+            relative_position_id: this.extractValue(block, 'relative_position_id'),
+            mutually_exclusive: this.extractValue(block, 'mutually_exclusive'),
+            available: this.extractValue(block, 'available'),
+            bypass: this.extractValue(block, 'bypass'),
+            ai_will_do: this.extractValue(block, 'ai_will_do')
+        };
         
-        // Create a simple demo tree
-        const focus1 = this.createFocusNode({
-            id: 'industrial_effort',
-            name: 'Industrial Effort',
-            x: 0,
-            y: 0,
-            cost: 10,
-            icon: 'GFX_goal_generic_production',
-            search_filters: ['FOCUS_FILTER_INDUSTRY', 'FOCUS_FILTER_RESEARCH'],
-            completion_reward: `add_tech_bonus = {
-    name = industrial_bonus
-    bonus = 1.0
-    uses = 1
-    category = industry
-}`,
-            branch: 'Industry'
-        });
+        if (!focus.id) {
+            console.warn('Focus block missing ID:', block.substring(0, 100));
+            return null;
+        }
         
-        const focus2 = this.createFocusNode({
-            id: 'army_effort',
-            name: 'Army Effort',
-            x: -2,
-            y: 2,
-            cost: 10,
-            icon: 'GFX_goal_generic_allies_build_infantry',
-            search_filters: ['FOCUS_FILTER_RESEARCH', 'FOCUS_FILTER_ARMY_XP'],
-            completion_reward: 'army_experience = 25',
-            branch: 'Army',
-            prerequisite: 'industrial_effort'
-        });
+        // Set a readable name
+        focus.name = this.formatFocusName(focus.id);
         
-        const focus3 = this.createFocusNode({
-            id: 'naval_effort', 
-            name: 'Naval Effort',
-            x: 2,
-            y: 2,
-            cost: 10,
-            icon: 'GFX_goal_generic_build_navy',
-            search_filters: ['FOCUS_FILTER_RESEARCH', 'FOCUS_FILTER_NAVY_XP'],
-            completion_reward: 'navy_experience = 25',
-            branch: 'Navy',
-            prerequisite: 'industrial_effort'
-        });
+        return focus;
+    }
+    
+    extractValue(block, key) {
+        const regex = new RegExp(`${key}\\s*=\\s*([^\\s\\n]+)`, 'i');
+        const match = block.match(regex);
+        return match ? match[1].replace(/"/g, '') : null;
+    }
+    
+    extractPrerequisite(block) {
+        const regex = /prerequisite\s*=\s*\{\s*focus\s*=\s*([^\s}]+)/i;
+        const match = block.match(regex);
+        return match ? match[1] : null;
+    }
+    
+    extractSearchFilters(block) {
+        const regex = /search_filters\s*=\s*\{([^}]+)\}/i;
+        const match = block.match(regex);
+        if (match) {
+            return match[1].trim();
+        }
+        return 'FOCUS_FILTER_RESEARCH'; // Default
+    }
+    
+    extractCompletionReward(block) {
+        const rewardStart = block.indexOf('completion_reward = {');
+        if (rewardStart === -1) return 'add_political_power = 100';
         
-        this.treeData.initial_show_position = { focus: 'industrial_effort' };
-        this.selectedNodes.add(focus1);
+        let braceCount = 0;
+        let rewardContent = '';
+        let inReward = false;
         
-        console.log('Demo tree created with', this.focusNodes.size, 'nodes');
+        for (let i = rewardStart; i < block.length; i++) {
+            const char = block[i];
+            if (char === '{') {
+                braceCount++;
+                if (braceCount === 1) {
+                    inReward = true;
+                    continue;
+                }
+            } else if (char === '}') {
+                braceCount--;
+                if (braceCount === 0) {
+                    break;
+                }
+            }
+            
+            if (inReward && braceCount >= 1) {
+                rewardContent += char;
+            }
+        }
+        
+        return rewardContent.trim() || 'add_political_power = 100';
     }
     
     createDefaultTree() {
@@ -267,17 +202,11 @@ class FocusEditor {
             y: 0,
             cost: 10,
             icon: 'GFX_goal_generic_production',
-            search_filters: ['FOCUS_FILTER_INDUSTRY', 'FOCUS_FILTER_RESEARCH'],
-            completion_reward: `add_tech_bonus = {
-    name = industrial_bonus
-    bonus = 1.0
-    uses = 1
-    category = industry
-}`,
+            search_filters: 'FOCUS_FILTER_INDUSTRY FOCUS_FILTER_RESEARCH',
+            completion_reward: 'add_tech_bonus = {\n\tname = industrial_bonus\n\tbonus = 1.0\n\tuses = 1\n\tcategory = industry\n}',
             branch: 'Industry'
         });
         
-        this.treeData.initial_show_position = { focus: 'industrial_effort' };
         this.selectedNodes.add(rootFocus);
         console.log('Default tree created');
     }
@@ -290,17 +219,17 @@ class FocusEditor {
             x: data.x || 0,
             y: data.y || 0,
             cost: data.cost || 10,
-            icon: data.icon || 'misc/focus_chud.dds',
+            icon: data.icon || 'GFX_goal_generic_production',
             prerequisite: data.prerequisite || null,
-            relative_position_id: data.relative_position_id || null,
-            mutually_exclusive: data.mutually_exclusive || [],
-            available: data.available || '',
-            available_if_capitulated: data.available_if_capitulated !== undefined ? data.available_if_capitulated : true,
+            search_filters: data.search_filters || 'FOCUS_FILTER_RESEARCH',
+            available_if_capitulated: true,
             completion_reward: data.completion_reward || 'add_political_power = 100',
-            search_filters: data.search_filters || ['FOCUS_FILTER_RESEARCH'],
-            ai_will_do: data.ai_will_do || { factor: 1 },
-            bypass: data.bypass || '',
-            branch: data.branch || 'General'
+            branch: data.branch || 'General',
+            relative_position_id: data.relative_position_id || null,
+            mutually_exclusive: data.mutually_exclusive || null,
+            available: data.available || null,
+            bypass: data.bypass || null,
+            ai_will_do: data.ai_will_do || null
         };
         
         this.focusNodes.set(focusId, node);
@@ -344,95 +273,70 @@ class FocusEditor {
         try {
             this.container.html(`
                 <div class="d-flex flex-column h-100">
-                    <!-- Enhanced Toolbar -->
+                    <!-- Toolbar -->
                     <div class="bg-dark border-bottom border-secondary p-2">
                         <div class="d-flex align-items-center flex-wrap gap-2">
-                            <!-- File Operations -->
-                            <div class="btn-group">
-                                <button class="btn btn-success btn-sm" id="save-focus-tree" title="Save (Ctrl+S)">
-                                    <i class="bi bi-save me-1"></i>Save
-                                </button>
-                                <button class="btn btn-outline-success btn-sm" id="validate-tree" title="Validate Tree">
-                                    <i class="bi bi-check-circle me-1"></i>Validate
-                                </button>
-                            </div>
-                            
-                            <!-- Edit Operations -->
-                            <div class="btn-group">
-                                <button class="btn btn-primary btn-sm" id="add-focus-node" title="Add Focus (A)">
-                                    <i class="bi bi-plus-circle me-1"></i>Add Focus
-                                </button>
-                                <button class="btn btn-outline-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" title="Templates">
-                                    <i class="bi bi-layers me-1"></i>Templates
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-dark">
-                                    <li><a class="dropdown-item template-btn" data-template="basic">Basic Focus</a></li>
-                                    <li><a class="dropdown-item template-btn" data-template="army">Army Focus</a></li>
-                                    <li><a class="dropdown-item template-btn" data-template="navy">Navy Focus</a></li>
-                                    <li><a class="dropdown-item template-btn" data-template="air">Air Focus</a></li>
-                                    <li><a class="dropdown-item template-btn" data-template="industry">Industry Focus</a></li>
-                                    <li><a class="dropdown-item template-btn" data-template="political">Political Focus</a></li>
-                                </ul>
-                            </div>
-                            
-                            <!-- Selection Operations -->
-                            <div class="btn-group">
-                                <button class="btn btn-warning btn-sm" id="copy-selected" title="Copy (Ctrl+C)">
-                                    <i class="bi bi-copy me-1"></i>Copy
-                                </button>
-                                <button class="btn btn-warning btn-sm" id="paste-nodes" title="Paste (Ctrl+V)" disabled>
-                                    <i class="bi bi-clipboard me-1"></i>Paste
-                                </button>
-                                <button class="btn btn-outline-warning btn-sm" id="delete-selected" title="Delete (Delete)">
-                                    <i class="bi bi-trash me-1"></i>Delete
-                                </button>
-                            </div>
-                            
-                            <!-- Status Indicators -->
+                            <button class="btn btn-success btn-sm" id="save-focus-tree">
+                                <i class="bi bi-save me-1"></i>Save
+                            </button>
+                            <button class="btn btn-primary btn-sm" id="add-focus-node">
+                                <i class="bi bi-plus-circle me-1"></i>Add Focus
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm" id="delete-selected">
+                                <i class="bi bi-trash me-1"></i>Delete
+                            </button>
                             <span class="text-muted ms-2" id="selection-count">0 selected</span>
-                            <span class="badge bg-danger ms-2 d-none" id="error-badge">0 errors</span>
                             
-                            <div class="ms-auto">
+                            <!-- Viewport Controls -->
+                            <div class="ms-auto btn-group">
+                                <button class="btn btn-outline-light btn-sm" id="zoom-out">
+                                    <i class="bi bi-dash"></i>
+                                </button>
+                                <button class="btn btn-outline-light btn-sm" id="reset-view">
+                                    <i class="bi bi-arrows-angle-expand"></i>
+                                </button>
+                                <button class="btn btn-outline-light btn-sm" id="zoom-in">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="ms-2">
                                 <span class="text-muted">${this.fileName}</span>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="flex-grow-1 d-flex">
+                    <div class="flex-grow-1 d-flex position-relative">
                         <!-- Focus Tree Canvas -->
-                        <div class="flex-grow-1 position-relative bg-dark" id="focus-canvas-container">
-                            <svg id="focus-canvas" class="w-100 h-100"></svg>
-                            
-                            <!-- Canvas Controls -->
-                            <div class="position-absolute top-0 end-0 p-2">
-                                <div class="btn-group-vertical">
-                                    <button class="btn btn-outline-light btn-sm" id="zoom-in" title="Zoom In">
-                                        <i class="bi bi-zoom-in"></i>
-                                    </button>
-                                    <button class="btn btn-outline-light btn-sm" id="zoom-out" title="Zoom Out">
-                                        <i class="bi bi-zoom-out"></i>
-                                    </button>
-                                    <button class="btn btn-outline-light btn-sm" id="reset-view" title="Reset View">
-                                        <i class="bi bi-arrows-angle-expand"></i>
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="flex-grow-1 position-relative bg-dark" id="focus-canvas-container" 
+                             style="overflow: hidden;">
+                            <div id="focus-canvas" class="position-relative" 
+                                 style="width: ${this.canvasWidth}px; height: ${this.canvasHeight}px; cursor: grab;"></div>
                             
                             <!-- Coordinates Display -->
                             <div class="position-absolute bottom-0 start-0 p-2">
                                 <div class="text-light small bg-dark bg-opacity-75 p-1 rounded">
-                                    Grid: 2x2 units per focus | Drag to pan | Scroll to zoom
+                                    Drag background to pan | Mouse wheel to zoom | Drag nodes to move
+                                </div>
+                            </div>
+                            
+                            <!-- Viewport Info -->
+                            <div class="position-absolute top-0 start-0 p-2">
+                                <div class="text-light small bg-dark bg-opacity-75 p-1 rounded">
+                                    Scale: ${Math.round(this.viewport.scale * 100)}% | 
+                                    View: (${this.viewport.x}, ${this.viewport.y})
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Properties Panel -->
-                        <div class="w-30 bg-dark border-start border-secondary d-flex flex-column" id="properties-panel" style="min-width: 350px; max-width: 400px;">
-                            <div class="p-3 border-bottom border-secondary">
+                        <div class="w-30 bg-dark border-start border-secondary d-flex flex-column position-relative" 
+                             style="min-width: 400px; max-width: 500px; z-index: 10; background: #1a1d20 !important;">
+                            <div class="p-3 border-bottom border-secondary" style="background: #1a1d20;">
                                 <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Focus Properties</h6>
                             </div>
-                            <div class="flex-grow-1 overflow-auto">
-                                <div id="node-properties" class="p-3">
+                            <div class="flex-grow-1 overflow-auto" style="background: #1a1d20;">
+                                <div id="node-properties" class="p-3" style="background: #1a1d20;">
                                     <div class="text-muted text-center py-4">
                                         <i class="bi bi-mouse2 display-6 d-block mb-2"></i>
                                         Select a focus node to edit its properties
@@ -472,43 +376,20 @@ class FocusEditor {
     renderCanvas() {
         console.log('Rendering canvas...');
         try {
-            const svg = this.container.find('#focus-canvas');
-            svg.empty();
+            const canvas = this.container.find('#focus-canvas');
+            canvas.empty();
             
-            const container = this.container.find('#focus-canvas-container');
-            const width = container.width();
-            const height = container.height();
+            // Apply viewport transform
+            canvas.css({
+                'transform': `translate(${this.viewport.x}px, ${this.viewport.y}px) scale(${this.viewport.scale})`,
+                'transform-origin': '0 0'
+            });
             
-            console.log('Canvas dimensions:', width, 'x', height);
-            
-            svg.attr('width', width);
-            svg.attr('height', height);
-            
-            // Create main group for zoom/pan
-            const mainGroup = svg.append('g')
-                .attr('class', 'main-group')
-                .attr('transform', `translate(${this.panOffset.x}, ${this.panOffset.y}) scale(${this.zoomLevel})`);
-            
-            // Draw grid
-            this.drawGrid(mainGroup, width, height);
-            
-            // Create arrowhead marker for connections
-            svg.append('defs').append('marker')
-                .attr('id', 'arrowhead')
-                .attr('markerWidth', 10)
-                .attr('markerHeight', 7)
-                .attr('refX', 9)
-                .attr('refY', 3.5)
-                .attr('orient', 'auto')
-                .append('polygon')
-                .attr('points', '0 0, 10 3.5, 0 7')
-                .attr('fill', '#0d6efd');
-            
-            // Draw connections first
-            this.drawConnections(mainGroup);
+            // Draw connections first (so they appear behind nodes)
+            this.drawConnections(canvas);
             
             // Draw focus nodes
-            this.drawFocusNodes(mainGroup);
+            this.drawFocusNodes(canvas);
             
             console.log('Canvas rendering completed');
         } catch (error) {
@@ -517,176 +398,137 @@ class FocusEditor {
         }
     }
     
-    drawGrid(svgGroup, width, height) {
-        console.log('Drawing grid...');
-        const gridSize = this.gridSize;
-        
-        const gridGroup = svgGroup.append('g').attr('class', 'grid');
-        
-        // Vertical lines
-        for (let x = 0; x <= width; x += gridSize) {
-            gridGroup.append('line')
-                .attr('x1', x)
-                .attr('y1', 0)
-                .attr('x2', x)
-                .attr('y2', height)
-                .attr('stroke', 'rgba(255,255,255,0.1)')
-                .attr('stroke-width', 1);
-        }
-        
-        // Horizontal lines
-        for (let y = 0; y <= height; y += gridSize) {
-            gridGroup.append('line')
-                .attr('x1', 0)
-                .attr('y1', y)
-                .attr('x2', width)
-                .attr('y2', y)
-                .attr('stroke', 'rgba(255,255,255,0.1)')
-                .attr('stroke-width', 1);
-        }
-    }
-    
-    drawConnections(svgGroup) {
+    drawConnections(canvas) {
         console.log('Drawing connections...');
         this.focusNodes.forEach((node, nodeId) => {
             if (node.prerequisite && this.focusNodes.has(node.prerequisite)) {
                 const parentNode = this.focusNodes.get(node.prerequisite);
-                this.drawConnection(svgGroup, parentNode, node);
+                this.drawConnection(canvas, parentNode, node);
             }
         });
     }
     
-    drawConnection(svgGroup, fromNode, toNode) {
+    drawConnection(canvas, fromNode, toNode) {
         const startX = (fromNode.x * this.gridSize) + (this.gridSize / 2);
         const startY = (fromNode.y * this.gridSize) + (this.gridSize / 2);
         const endX = (toNode.x * this.gridSize) + (this.gridSize / 2);
         const endY = (toNode.y * this.gridSize) + (this.gridSize / 2);
         
-        // Calculate control points for curved lines
-        const midX = (startX + endX) / 2;
-        const curveStrength = Math.min(Math.abs(endY - startY) * 0.3, 50);
+        // Create connection line
+        const connection = $(`
+            <div class="position-absolute" style="
+                left: ${startX}px; 
+                top: ${startY}px; 
+                width: ${Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2))}px;
+                height: 2px;
+                background: #0d6efd;
+                transform-origin: 0 0;
+                transform: rotate(${Math.atan2(endY - startY, endX - startX)}rad);
+                z-index: 1;
+            "></div>
+        `);
         
-        const path = `M ${startX} ${startY} C ${midX} ${startY + curveStrength}, ${midX} ${endY - curveStrength}, ${endX} ${endY}`;
-        
-        svgGroup.append('path')
-            .attr('d', path)
-            .attr('fill', 'none')
-            .attr('stroke', '#0d6efd')
-            .attr('stroke-width', 2)
-            .attr('marker-end', 'url(#arrowhead)');
+        canvas.append(connection);
     }
     
-    drawFocusNodes(svgGroup) {
+    drawFocusNodes(canvas) {
         console.log('Drawing focus nodes...');
         this.focusNodes.forEach((node, nodeId) => {
-            this.drawFocusNode(svgGroup, node);
+            this.drawFocusNode(canvas, node);
         });
     }
     
-    drawFocusNode(svgGroup, node) {
-        const group = svgGroup.append('g')
-            .attr('class', 'focus-node')
-            .attr('transform', `translate(${node.x * this.gridSize}, ${node.y * this.gridSize})`)
-            .style('cursor', 'pointer')
-            .attr('data-node-id', node.id);
-            
+    drawFocusNode(canvas, node) {
         const isSelected = this.selectedNodes.has(node);
         const branch = this.branches.get(node.branch);
         const branchColor = branch ? branch.color : '#6c757d';
-        const nodeWidth = this.gridSize - 10;
-        const nodeHeight = this.gridSize - 10;
         
-        // Node background
-        group.append('rect')
-            .attr('width', nodeWidth)
-            .attr('height', nodeHeight)
-            .attr('x', 5)
-            .attr('y', 5)
-            .attr('rx', 6)
-            .attr('fill', isSelected ? branchColor : '#495057')
-            .attr('stroke', isSelected ? '#ffffff' : branchColor)
-            .attr('stroke-width', isSelected ? 3 : 2);
-            
-        // Focus icon
-        group.append('text')
-            .attr('x', nodeWidth / 2 + 5)
-            .attr('y', nodeHeight / 2 - 5)
-            .attr('text-anchor', 'middle')
-            .attr('fill', 'white')
-            .attr('font-size', '16px')
-            .text('🎯');
-            
-        // Focus name
-        group.append('text')
-            .attr('x', nodeWidth / 2 + 5)
-            .attr('y', nodeHeight / 2 + 15)
-            .attr('text-anchor', 'middle')
-            .attr('fill', 'white')
-            .attr('font-size', '9px')
-            .attr('font-weight', 'bold')
-            .text(node.name.length > 10 ? node.name.substring(0, 10) + '...' : node.name);
-            
-        // Focus cost
-        group.append('circle')
-            .attr('cx', nodeWidth - 5)
-            .attr('cy', 10)
-            .attr('r', 8)
-            .attr('fill', '#198754');
-            
-        group.append('text')
-            .attr('x', nodeWidth - 5)
-            .attr('y', 13)
-            .attr('text-anchor', 'middle')
-            .attr('fill', 'white')
-            .attr('font-size', '8px')
-            .attr('font-weight', 'bold')
-            .text(node.cost);
-            
+        const nodeElement = $(`
+            <div class="focus-node position-absolute rounded shadow" style="
+                left: ${node.x * this.gridSize}px;
+                top: ${node.y * this.gridSize}px;
+                width: ${this.gridSize - 10}px;
+                height: ${this.gridSize - 10}px;
+                background: ${isSelected ? branchColor : '#495057'};
+                border: 2px solid ${isSelected ? '#ffffff' : branchColor};
+                cursor: pointer;
+                z-index: 2;
+            " data-node-id="${node.id}">
+                <div class="w-100 h-100 d-flex flex-column align-items-center justify-content-center p-1">
+                    <div class="text-white" style="font-size: 16px;">🎯</div>
+                    <div class="text-white text-center small fw-bold mt-1" style="font-size: 9px; line-height: 1.1;">
+                        ${node.name.length > 10 ? node.name.substring(0, 10) + '...' : node.name}
+                    </div>
+                </div>
+                <div class="position-absolute top-0 end-0 m-1 bg-success rounded-circle d-flex align-items-center justify-content-center" 
+                     style="width: 16px; height: 16px; font-size: 8px; color: white; font-weight: bold;">
+                    ${node.cost}
+                </div>
+            </div>
+        `);
+        
         // Click handler
-        group.on('click', (event) => {
+        nodeElement.on('click', (event) => {
             event.stopPropagation();
             this.selectNode(node);
         });
         
         // Drag handlers
-        this.makeDraggable(group, node);
+        this.makeDraggable(nodeElement, node);
+        
+        canvas.append(nodeElement);
     }
     
-    makeDraggable(group, node) {
+    makeDraggable(element, node) {
         let isDragging = false;
         let startX, startY, startNodeX, startNodeY;
         
-        group.on('mousedown', (event) => {
+        element.on('mousedown', (event) => {
             isDragging = true;
             startX = event.clientX;
             startY = event.clientY;
             startNodeX = node.x;
             startNodeY = node.y;
             event.stopPropagation();
+            
+            // Change cursor
+            element.css('cursor', 'grabbing');
         });
         
-        $(document).on('mousemove', (event) => {
+        const mouseMoveHandler = (event) => {
             if (!isDragging) return;
             
             const deltaX = event.clientX - startX;
             const deltaY = event.clientY - startY;
             
-            const gridDeltaX = Math.round(deltaX / this.gridSize);
-            const gridDeltaY = Math.round(deltaY / this.gridSize);
+            // Convert screen delta to grid delta considering viewport scale
+            const gridDeltaX = Math.round(deltaX / (this.gridSize * this.viewport.scale));
+            const gridDeltaY = Math.round(deltaY / (this.gridSize * this.viewport.scale));
             
             const newX = startNodeX + gridDeltaX;
             const newY = startNodeY + gridDeltaY;
             
-            if (newX !== node.x || newY !== node.y) {
-                node.x = newX;
-                node.y = newY;
+            // Constrain to canvas bounds (0 to 999)
+            const constrainedX = Math.max(0, Math.min(999, newX));
+            const constrainedY = Math.max(0, Math.min(999, newY));
+            
+            if (constrainedX !== node.x || constrainedY !== node.y) {
+                node.x = constrainedX;
+                node.y = constrainedY;
                 this.renderCanvas();
+                this.updatePropertiesForm(node); // Update form in real-time
             }
-        });
+        };
         
-        $(document).on('mouseup', () => {
+        const mouseUpHandler = () => {
             isDragging = false;
-        });
+            element.css('cursor', 'pointer');
+            $(document).off('mousemove', mouseMoveHandler);
+            $(document).off('mouseup', mouseUpHandler);
+        };
+        
+        $(document).on('mousemove', mouseMoveHandler);
+        $(document).on('mouseup', mouseUpHandler);
     }
     
     selectNode(node) {
@@ -732,12 +574,12 @@ class FocusEditor {
                     <div class="col-6">
                         <label class="form-label small fw-bold">X Position</label>
                         <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
-                               name="x" value="${node.x}" step="1">
+                               name="x" value="${node.x}" step="1" min="0" max="999">
                     </div>
                     <div class="col-6">
                         <label class="form-label small fw-bold">Y Position</label>
                         <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
-                               name="y" value="${node.y}" step="1">
+                               name="y" value="${node.y}" step="1" min="0" max="999">
                     </div>
                 </div>
                 
@@ -749,12 +591,8 @@ class FocusEditor {
                 
                 <div class="mb-3">
                     <label class="form-label small fw-bold">Icon</label>
-                    <select class="form-select form-select-sm bg-dark text-light border-secondary" name="icon">
-                        <option value="misc/focus_chud.dds" ${node.icon === 'misc/focus_chud.dds' ? 'selected' : ''}>Default (focus_chud.dds)</option>
-                        ${this.commonIcons.map(icon => 
-                            `<option value="${icon}" ${node.icon === icon ? 'selected' : ''}>${icon.replace('GFX_', '')}</option>`
-                        ).join('')}
-                    </select>
+                    <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                           name="icon" value="${node.icon}">
                 </div>
                 
                 <div class="mb-3">
@@ -770,34 +608,29 @@ class FocusEditor {
                 
                 <div class="mb-3">
                     <label class="form-label small fw-bold">Search Filters</label>
-                    <div class="border border-secondary rounded p-2 bg-dark">
-                        ${this.searchFilters.map(filter => `
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="search_filters" 
-                                       value="${filter}" id="filter-${filter}" 
-                                       ${node.search_filters.includes(filter) ? 'checked' : ''}>
-                                <label class="form-check-label small text-light" for="filter-${filter}">
-                                    ${filter.replace('FOCUS_FILTER_', '')}
-                                </label>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" name="available_if_capitulated" 
-                               ${node.available_if_capitulated ? 'checked' : ''}>
-                        <label class="form-check-label small text-light">Available if Capitulated</label>
-                    </div>
+                    <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                           name="search_filters" value="${node.search_filters || ''}">
+                    <div class="form-text text-muted">Space-separated filter names</div>
                 </div>
                 
                 <div class="mb-3">
                     <label class="form-label small fw-bold">Completion Reward</label>
                     <textarea class="form-control form-control-sm bg-dark text-light border-secondary" 
-                              name="completion_reward" rows="4" 
-                              placeholder="add_political_power = 100&#10;army_experience = 25"
-                              style="font-family: 'Courier New', monospace; font-size: 12px;">${node.completion_reward}</textarea>
+                              name="completion_reward" rows="6" style="font-family: monospace; font-size: 12px;">${node.completion_reward || ''}</textarea>
+                    <div class="form-text text-muted">HOI4 script code for completion reward</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Branch</label>
+                    <select class="form-select form-select-sm bg-dark text-light border-secondary" name="branch">
+                        <option value="General" ${node.branch === 'General' ? 'selected' : ''}>General</option>
+                        <option value="Army" ${node.branch === 'Army' ? 'selected' : ''}>Army</option>
+                        <option value="Navy" ${node.branch === 'Navy' ? 'selected' : ''}>Navy</option>
+                        <option value="Air Force" ${node.branch === 'Air Force' ? 'selected' : ''}>Air Force</option>
+                        <option value="Industry" ${node.branch === 'Industry' ? 'selected' : ''}>Industry</option>
+                        <option value="Politics" ${node.branch === 'Politics' ? 'selected' : ''}>Politics</option>
+                        <option value="Research" ${node.branch === 'Research' ? 'selected' : ''}>Research</option>
+                    </select>
                 </div>
                 
                 <div class="mt-4 pt-3 border-top border-secondary">
@@ -815,6 +648,15 @@ class FocusEditor {
         });
     }
     
+    updatePropertiesForm(node) {
+        // Update form fields if they exist
+        const form = this.container.find('#focus-properties-form');
+        if (form.length) {
+            form.find('input[name="x"]').val(node.x);
+            form.find('input[name="y"]').val(node.y);
+        }
+    }
+    
     updateNodeProperties(node, formData) {
         console.log('Updating node properties:', node.id);
         const oldId = node.id;
@@ -826,9 +668,13 @@ class FocusEditor {
         node.cost = parseInt(formData.get('cost'));
         node.icon = formData.get('icon');
         node.prerequisite = formData.get('prerequisite') || null;
-        node.available_if_capitulated = formData.get('available_if_capitulated') === 'on';
-        node.search_filters = formData.getAll('search_filters');
-        node.completion_reward = formData.get('completion_reward') || 'add_political_power = 100';
+        node.search_filters = formData.get('search_filters');
+        node.completion_reward = formData.get('completion_reward');
+        node.branch = formData.get('branch');
+        
+        // Constrain coordinates to canvas bounds
+        node.x = Math.max(0, Math.min(999, node.x));
+        node.y = Math.max(0, Math.min(999, node.y));
         
         // Update the node in our map if ID changed
         if (oldId !== node.id) {
@@ -852,17 +698,10 @@ class FocusEditor {
                 x: this.selectedNodes.size ? Array.from(this.selectedNodes)[0].x + 2 : 0,
                 y: this.selectedNodes.size ? Array.from(this.selectedNodes)[0].y : 0,
                 cost: 10,
-                icon: 'misc/focus_chud.dds'
+                icon: 'GFX_goal_generic_production'
             });
             this.selectNode(newNode);
             this.renderCanvas();
-        });
-        
-        // Template buttons
-        this.container.find('.template-btn').on('click', (e) => {
-            const template = $(e.target).data('template');
-            console.log('Template clicked:', template);
-            this.addFocusFromTemplate(template);
         });
         
         // Save focus tree
@@ -871,69 +710,86 @@ class FocusEditor {
             this.saveFocusTree();
         });
         
-        // Validate tree
-        this.container.find('#validate-tree').on('click', () => {
-            console.log('Validate tree clicked');
-            this.runValidation(true);
-        });
-        
-        // Copy selected
-        this.container.find('#copy-selected').on('click', () => {
-            console.log('Copy selected clicked');
-            this.copySelected();
-        });
-        
         // Delete selected
         this.container.find('#delete-selected').on('click', () => {
             console.log('Delete selected clicked');
             this.deleteSelected();
         });
         
-        // View controls
-        this.container.find('#zoom-in').on('click', () => this.zoom(1.2));
-        this.container.find('#zoom-out').on('click', () => this.zoom(0.8));
-        this.container.find('#reset-view').on('click', () => this.resetView());
+        // Viewport controls
+        this.container.find('#zoom-in').on('click', () => {
+            this.viewport.scale = Math.min(this.viewport.scale * 1.2, 3.0);
+            this.renderCanvas();
+        });
+        
+        this.container.find('#zoom-out').on('click', () => {
+            this.viewport.scale = Math.max(this.viewport.scale / 1.2, 0.1);
+            this.renderCanvas();
+        });
+        
+        this.container.find('#reset-view').on('click', () => {
+            this.viewport = { x: 0, y: 0, scale: 1.0 };
+            this.renderCanvas();
+        });
+        
+        // Canvas panning
+        this.setupCanvasPanning();
+        
+        // Canvas click to deselect
+        this.container.find('#focus-canvas-container').on('click', (e) => {
+            if (e.target.id === 'focus-canvas-container' || e.target.id === 'focus-canvas') {
+                this.selectedNodes.clear();
+                this.renderPropertiesPanel();
+                this.updateStatusBar();
+            }
+        });
         
         console.log('Event listeners setup completed');
     }
     
-    setupKeyboardShortcuts() {
-        console.log('Setting up keyboard shortcuts...');
-        // Basic keyboard shortcuts can be added here
-    }
-    
-    addFocusFromTemplate(templateName) {
-        console.log('Adding focus from template:', templateName);
-        const template = this.focusTemplates[templateName] || this.focusTemplates.basic;
+    setupCanvasPanning() {
+        const container = this.container.find('#focus-canvas-container');
+        const canvas = this.container.find('#focus-canvas');
         
-        let x = 0, y = 0;
-        if (this.selectedNodes.size > 0) {
-            const lastSelected = Array.from(this.selectedNodes).pop();
-            x = lastSelected.x + 2;
-            y = lastSelected.y;
-        }
-        
-        const newNode = this.createFocusNode({
-            name: template.name,
-            x: x,
-            y: y,
-            cost: template.cost,
-            icon: template.icon,
-            search_filters: [...template.search_filters],
-            completion_reward: template.completion_reward
+        container.on('mousedown', (e) => {
+            if (e.target.id === 'focus-canvas-container' || e.target.id === 'focus-canvas') {
+                this.isDragging = true;
+                this.dragStart = { x: e.clientX, y: e.clientY };
+                this.viewportStart = { x: this.viewport.x, y: this.viewport.y };
+                canvas.css('cursor', 'grabbing');
+                e.preventDefault();
+            }
         });
         
-        this.selectedNodes.clear();
-        this.selectedNodes.add(newNode);
-        this.renderCanvas();
-        this.renderPropertiesPanel();
-        this.updateStatusBar();
-    }
-    
-    copySelected() {
-        if (this.selectedNodes.size === 0) return;
-        console.log('Copying', this.selectedNodes.size, 'nodes');
-        // Basic copy functionality
+        $(document).on('mousemove', (e) => {
+            if (!this.isDragging) return;
+            
+            const deltaX = e.clientX - this.dragStart.x;
+            const deltaY = e.clientY - this.dragStart.y;
+            
+            this.viewport.x = this.viewportStart.x + deltaX;
+            this.viewport.y = this.viewportStart.y + deltaY;
+            
+            this.renderCanvas();
+        });
+        
+        $(document).on('mouseup', () => {
+            if (this.isDragging) {
+                this.isDragging = false;
+                canvas.css('cursor', 'grab');
+            }
+        });
+        
+        // Mouse wheel zoom
+        container.on('wheel', (e) => {
+            e.preventDefault();
+            const zoomIntensity = 0.1;
+            const wheel = e.originalEvent.deltaY < 0 ? 1 : -1;
+            const zoom = Math.exp(wheel * zoomIntensity);
+            
+            this.viewport.scale = Math.max(0.1, Math.min(3.0, this.viewport.scale * zoom));
+            this.renderCanvas();
+        });
     }
     
     deleteSelected() {
@@ -953,24 +809,6 @@ class FocusEditor {
         this.updateStatusBar();
     }
     
-    runValidation(showResults = false) {
-        console.log('Running validation...');
-        this.validationErrors.clear();
-        // Basic validation can be added here
-    }
-    
-    zoom(factor) {
-        console.log('Zooming:', factor);
-        // Basic zoom functionality
-    }
-    
-    resetView() {
-        console.log('Resetting view');
-        this.zoomLevel = 1;
-        this.panOffset = { x: 0, y: 0 };
-        this.renderCanvas();
-    }
-    
     updateStatusBar() {
         this.container.find('#selected-node-info').text(
             this.selectedNodes.size === 0 ? 'No focus selected' : 
@@ -978,6 +816,9 @@ class FocusEditor {
         );
         this.container.find('#node-count').text(
             `${this.focusNodes.size} focus${this.focusNodes.size !== 1 ? 'es' : ''}`
+        );
+        this.container.find('#selection-count').text(
+            `${this.selectedNodes.size} selected`
         );
     }
     
@@ -1010,28 +851,28 @@ class FocusEditor {
         console.log('Generating focus tree code...');
         let code = '';
         
-        // Add search filter priorities
+        // Add search filter priorities (from the example you provided)
         code += `search_filter_prios = {\n`;
-        for (const [filter, priority] of Object.entries(this.treeData.search_filter_prios)) {
-            code += `\t${filter} = ${priority}\n`;
-        }
+        code += `\tFOCUS_FILTER_POLITICAL = 1010\n`;
+        code += `\tFOCUS_FILTER_RESEARCH = 522\n`;
+        code += `\tFOCUS_FILTER_INDUSTRY = 509\n`;
+        code += `\tFOCUS_FILTER_BALANCE_OF_POWER = 200\n`;
+        code += `\tFOCUS_FILTER_SOV_POLITICAL_PARANOIA = 111\n`;
+        code += `\tFOCUS_FILTER_PROPAGANDA = 110\n`;
+        code += `\tFOCUS_FILTER_MISSIOLINI = 110\n`;
+        code += `\tFOCUS_FILTER_ARMY_XP = 103\n`;
+        code += `\tFOCUS_FILTER_NAVY_XP = 102\n`;
+        code += `\tFOCUS_FILTER_AIR_XP = 101\n`;
         code += `}\n\n`;
         
         // Main focus tree definition
         code += `focus_tree = {\n`;
-        code += `\tid = "${this.treeData.id}"\n\n`;
+        code += `\tid = "${this.fileName.replace('.txt', '')}"\n\n`;
         code += `\tcountry = {\n`;
         code += `\t\tfactor = 1\n`;
         code += `\t}\n\n`;
-        code += `\tdefault = ${this.treeData.default ? 'yes' : 'no'}\n`;
-        code += `\treset_on_civilwar = ${this.treeData.reset_on_civilwar ? 'yes' : 'no'}\n\n`;
-        
-        // Initial show position
-        if (this.treeData.initial_show_position) {
-            code += `\tinitial_show_position = {\n`;
-            code += `\t\tfocus = ${this.treeData.initial_show_position.focus}\n`;
-            code += `\t}\n\n`;
-        }
+        code += `\tdefault = yes\n`;
+        code += `\treset_on_civilwar = no\n\n`;
         
         // Add each focus
         this.focusNodes.forEach((node, nodeId) => {
@@ -1054,17 +895,13 @@ class FocusEditor {
             focusCode += `\t\tprerequisite = { focus = ${node.prerequisite} }\n`;
         }
         
-        if (node.search_filters && node.search_filters.length > 0) {
-            focusCode += `\t\tsearch_filters = { `;
-            focusCode += node.search_filters.map(filter => filter).join(' ');
-            focusCode += ` }\n`;
+        if (node.search_filters && node.search_filters.trim()) {
+            focusCode += `\t\tsearch_filters = { ${node.search_filters} }\n`;
         }
         
-        if (!node.available_if_capitulated) {
-            focusCode += `\t\tavailable_if_capitulated = no\n`;
-        }
+        focusCode += `\t\tavailable_if_capitulated = yes\n\n`;
         
-        focusCode += `\n\t\tcompletion_reward = {\n`;
+        focusCode += `\t\tcompletion_reward = {\n`;
         const rewardLines = node.completion_reward.split('\n');
         rewardLines.forEach(line => {
             if (line.trim()) {

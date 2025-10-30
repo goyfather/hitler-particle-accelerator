@@ -2,6 +2,9 @@ from flask import Blueprint, render_template, request, jsonify
 import os
 import json
 import sys
+from editors.state_editor import StateEditor
+from io import BytesIO
+import base64
 
 # Add the editors directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -377,6 +380,44 @@ def create_state():
             'state_id': new_state_id,
             'message': f'Created state {new_state_id}'
         })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/get_country_colors', methods=['POST'])
+def get_country_colors():
+    """Get country colors from country definition files"""
+    if not project_manager.current_project:
+        return jsonify({'success': False, 'error': 'No project loaded'})
+    
+    colors = {}
+    countries_dir = os.path.join(project_manager.current_project, 'common', 'countries')
+    
+    try:
+        # First, read the country tags file
+        tags_file = os.path.join(project_manager.current_project, 'common', 'country_tags', '00_countries.txt')
+        if os.path.exists(tags_file):
+            with open(tags_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Parse country tag assignments
+            import re
+            tag_pattern = re.compile(r'(\w{3})\s*=\s*"countries/([^"]+)"')
+            matches = tag_pattern.findall(content)
+            
+            for tag, country_file in matches:
+                country_path = os.path.join(countries_dir, country_file)
+                if os.path.exists(country_path):
+                    with open(country_path, 'r', encoding='utf-8') as cf:
+                        country_content = cf.read()
+                    
+                    # Extract color
+                    color_match = re.search(r'color\s*=\s*{\s*(\d+)\s*(\d+)\s*(\d+)\s*}', country_content)
+                    if color_match:
+                        r, g, b = map(int, color_match.groups())
+                        colors[tag] = [r, g, b]
+        
+        return jsonify({'success': True, 'colors': colors})
+    
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
