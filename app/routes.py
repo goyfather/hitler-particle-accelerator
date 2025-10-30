@@ -188,6 +188,271 @@ def create_country():
     )
     
     return jsonify({'success': success, 'message': message})
+state_editor = None
+
+@main.route('/api/state_editor/check_files', methods=['POST'])
+def check_state_files():
+    """Check if required map files exist"""
+    if not project_manager.current_project:
+        return jsonify({'success': False, 'error': 'No project loaded'})
+    
+    global state_editor
+    state_editor = StateEditor(project_manager.current_project)
+    
+    missing = state_editor.check_required_files()
+    
+    return jsonify({
+        'success': True,
+        'files_exist': len(missing) == 0,
+        'missing_files': missing
+    })
+
+@main.route('/api/state_editor/validate_hoi4_dir', methods=['POST'])
+def validate_hoi4_dir():
+    """Validate HOI4 game directory"""
+    data = request.get_json()
+    hoi4_dir = data.get('path', '').strip()
+    
+    if not hoi4_dir:
+        return jsonify({'success': False, 'error': 'No path provided'})
+    
+    global state_editor
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    is_valid = state_editor.find_hoi4_directory(hoi4_dir)
+    
+    return jsonify({'success': True, 'valid': is_valid})
+
+@main.route('/api/state_editor/copy_game_files', methods=['POST'])
+def copy_game_files():
+    """Copy required files from HOI4 game directory"""
+    data = request.get_json()
+    hoi4_dir = data.get('path', '').strip()
+    
+    if not hoi4_dir:
+        return jsonify({'success': False, 'error': 'No path provided'})
+    
+    global state_editor
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    success, message = state_editor.copy_files_from_game(hoi4_dir)
+    
+    return jsonify({'success': success, 'message': message})
+
+@main.route('/api/state_editor/initialize', methods=['POST'])
+def initialize_state_editor():
+    """Initialize the state editor - parse files and load data"""
+    global state_editor
+    
+    if not project_manager.current_project:
+        return jsonify({'success': False, 'error': 'No project loaded'})
+    
+    if not state_editor:
+        state_editor = StateEditor(project_manager.current_project)
+    
+    # Parse definition.csv
+    success, message = state_editor.parse_definition_csv()
+    if not success:
+        return jsonify({'success': False, 'error': message})
+    
+    # Load all states
+    success, message = state_editor.load_all_states()
+    if not success:
+        return jsonify({'success': False, 'error': message})
+    
+    # Get summary data
+    states_summary = state_editor.get_all_states_summary()
+    
+    return jsonify({
+        'success': True,
+        'province_count': len(state_editor.provinces),
+        'state_count': len(state_editor.states),
+        'states': states_summary
+    })
+
+@main.route('/api/state_editor/get_map_image', methods=['POST'])
+def get_map_image():
+    """Get the provinces.bmp as base64 for frontend rendering"""
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        success, img = state_editor.load_provinces_image()
+        if not success:
+            return jsonify({'success': False, 'error': 'Failed to load image'})
+        
+        # Convert to base64
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        
+        return jsonify({
+            'success': True,
+            'image': f'data:image/png;base64,{img_str}',
+            'width': img.width,
+            'height': img.height
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/get_province_data', methods=['POST'])
+def get_province_data():
+    """Get all province data for frontend"""
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    return jsonify({
+        'success': True,
+        'provinces': state_editor.provinces,
+        'color_map': state_editor.get_province_color_map()
+    })
+
+@main.route('/api/state_editor/get_province_at_pixel', methods=['POST'])
+def get_province_at_pixel():
+    """Get province ID at specific pixel coordinates"""
+    data = request.get_json()
+    x = data.get('x')
+    y = data.get('y')
+    
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        success, img = state_editor.load_provinces_image()
+        if not success:
+            return jsonify({'success': False, 'error': 'Failed to load image'})
+        
+        # Get pixel color
+        pixel = img.getpixel((x, y))
+        
+        # Find matching province
+        color_map = state_editor.get_province_color_map()
+        province_id = color_map.get(pixel)
+        
+        if province_id:
+            # Get state info
+            state_id = state_editor.get_province_state(province_id)
+            state_info = None
+            if state_id:
+                state_info = state_editor.get_state_info(state_id)
+            
+            return jsonify({
+                'success': True,
+                'province_id': province_id,
+                'state_id': state_id,
+                'state_info': state_info
+            })
+        else:
+            return jsonify({'success': False, 'error': 'No province at this location'})
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/create_state', methods=['POST'])
+def create_state():
+    """Create a new state with a province"""
+    data = request.get_json()
+    province_id = data.get('province_id')
+    owner_tag = data.get('owner_tag', 'XXX')
+    
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        new_state_id = state_editor.create_new_state(province_id, owner_tag)
+        success, message = state_editor.save_state(new_state_id)
+        
+        return jsonify({
+            'success': True,
+            'state_id': new_state_id,
+            'message': f'Created state {new_state_id}'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/add_province_to_state', methods=['POST'])
+def add_province_to_state():
+    """Add a province to an existing state"""
+    data = request.get_json()
+    state_id = data.get('state_id')
+    province_id = data.get('province_id')
+    
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        success, message = state_editor.add_province_to_state(state_id, province_id)
+        if success:
+            state_editor.save_state(state_id)
+        
+        return jsonify({'success': success, 'message': message})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/set_state_owner', methods=['POST'])
+def set_state_owner():
+    """Set the owner of a state"""
+    data = request.get_json()
+    state_id = data.get('state_id')
+    owner_tag = data.get('owner_tag')
+    
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        success, message = state_editor.set_state_owner(state_id, owner_tag)
+        if success:
+            state_editor.save_state(state_id)
+        
+        return jsonify({'success': success, 'message': message})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/get_available_tags', methods=['POST'])
+def get_available_tags():
+    """Get list of available country tags"""
+    if not project_manager.current_project:
+        return jsonify({'success': False, 'error': 'No project loaded'})
+    
+    tags_file = os.path.join(project_manager.current_project, 'common', 'country_tags', '00_countries.txt')
+    
+    tags = []
+    if os.path.exists(tags_file):
+        try:
+            with open(tags_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            # Extract tags
+            import re
+            tags = re.findall(r'^(\w{3})\s*=', content, re.MULTILINE)
+        except:
+            pass
+    
+    return jsonify({'success': True, 'tags': tags})
+
+@main.route('/api/state_editor/save_all', methods=['POST'])
+def save_all_states():
+    """Save all modified states"""
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    success, message = state_editor.save_all_states()
+    return jsonify({'success': success, 'message': message})
 
 @main.route('/api/save_file', methods=['POST'])
 def save_file():

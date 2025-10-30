@@ -4,14 +4,16 @@ class HOI4ModEditor {
         this.openTabs = new Map();
         this.unsavedChanges = new Set();
         
-        // Initialize everything in correct order
+        console.log('HOI4ModEditor initializing...');
+        
         this.initCountryEditor();
         this.initFocusTreeEditor();
         this.initEventListeners();
+        
+        console.log('HOI4ModEditor initialized');
     }
 
     initCountryEditor() {
-        // Create country editor button
         const countryButton = $(`
             <button class="btn btn-info w-100 mb-2" id="create-country-btn">
                 <i class="bi bi-flag me-2"></i>Create Country
@@ -19,7 +21,6 @@ class HOI4ModEditor {
         `);
         $('#open-project-btn').after(countryButton);
 
-        // Create modal for country creation
         const modalHTML = `
         <div class="modal fade" id="country-creator-modal" tabindex="-1">
             <div class="modal-dialog">
@@ -93,17 +94,14 @@ class HOI4ModEditor {
         `;
         $('body').append(modalHTML);
 
-        // Store modal instance
         this.countryModal = new bootstrap.Modal(document.getElementById('country-creator-modal'));
 
-        // Set up event handlers
         $('#create-country-btn').on('click', () => this.openCountryCreator());
         $('#confirm-country-create').on('click', () => this.createCountry());
         $('#country-color-picker').on('input', (e) => this.updateColorPreview(e.target.value));
     }
 
     initFocusTreeEditor() {
-        // Create focus tree editor button
         const focusTreeButton = $(`
             <button class="btn btn-warning w-100 mb-2" id="create-focus-tree-btn">
                 <i class="bi bi-diagram-3 me-2"></i>New Focus Tree
@@ -111,7 +109,6 @@ class HOI4ModEditor {
         `);
         $('#create-country-btn').after(focusTreeButton);
 
-        // Create modal for focus tree creation
         const modalHTML = `
         <div class="modal fade" id="focus-tree-creator-modal" tabindex="-1">
             <div class="modal-dialog">
@@ -140,10 +137,8 @@ class HOI4ModEditor {
         `;
         $('body').append(modalHTML);
 
-        // Store modal instance
         this.focusTreeModal = new bootstrap.Modal(document.getElementById('focus-tree-creator-modal'));
 
-        // Set up event handlers
         $('#create-focus-tree-btn').on('click', () => this.openFocusTreeCreator());
         $('#confirm-focus-tree-create').on('click', () => this.createFocusTree());
     }
@@ -162,7 +157,6 @@ class HOI4ModEditor {
             return;
         }
         
-        // Reset form
         $('#country-tag').val('');
         $('#country-name').val('');
         $('#country-color-picker').val('#3d85c6');
@@ -209,7 +203,6 @@ class HOI4ModEditor {
                 alert(`Success: ${result.message}`);
                 this.countryModal.hide();
                 
-                // Refresh file tree
                 if (this.currentProject) {
                     const response = await fetch('/api/open_project', {
                         method: 'POST',
@@ -236,9 +229,7 @@ class HOI4ModEditor {
             return;
         }
         
-        // Reset form
         $('#focus-tree-name').val('');
-        
         this.focusTreeModal.show();
     }
 
@@ -263,7 +254,6 @@ class HOI4ModEditor {
                 alert(`Success: ${result.message}`);
                 this.focusTreeModal.hide();
                 
-                // Refresh file tree
                 if (this.currentProject) {
                     const response = await fetch('/api/open_project', {
                         method: 'POST',
@@ -326,7 +316,6 @@ class HOI4ModEditor {
             const itemElement = $('<div>').addClass('mb-1');
             
             if (item.type === 'folder') {
-                // Folder item
                 const folderElement = $('<div>')
                     .addClass('folder-item d-flex align-items-center')
                     .css('padding-left', `${depth * 15}px`)
@@ -343,12 +332,10 @@ class HOI4ModEditor {
                 
                 itemElement.append(folderElement);
                 
-                // Folder contents
                 const contentsElement = $('<div>')
                     .addClass('folder-contents')
-                    .css('display', depth === 0 ? 'block' : 'none'); // Root expanded, others collapsed
+                    .css('display', depth === 0 ? 'block' : 'none');
                 
-                // Add children
                 if (item.children && item.children.length > 0) {
                     item.children.forEach(child => {
                         contentsElement.append(renderItem(child, depth + 1));
@@ -359,13 +346,11 @@ class HOI4ModEditor {
                 
                 itemElement.append(contentsElement);
                 
-                // Set initial icon state
                 if (depth === 0) {
                     folderElement.find('i').addClass('bi-folder-fill');
                 }
                 
             } else {
-                // File item
                 const fileElement = $('<div>')
                     .addClass('file-item d-flex align-items-center')
                     .css('padding-left', `${depth * 15}px`)
@@ -378,7 +363,6 @@ class HOI4ModEditor {
             return itemElement;
         };
 
-        // Start rendering from root's children
         structure.children.forEach(child => {
             treeContainer.append(renderItem(child, 0));
         });
@@ -388,17 +372,32 @@ class HOI4ModEditor {
         if (filename.endsWith('.mod')) {
             return 'bi-gear-fill text-warning';
         }
+        if (filename.endsWith('.dds') || filename.endsWith('.tga')) {
+            return 'bi-image text-info';
+        }
+        if (filename.endsWith('.gfx') || filename.endsWith('.gui')) {
+            return 'bi-palette text-success';
+        }
         return 'bi-file-text';
     }
 
     async openFile(path, name) {
-        // Check if it's a focus tree file
-        if (path.includes('common/national_focus/') && path.endsWith('.txt')) {
+        console.log('Opening file:', path, name);
+        
+        const normalizedPath = path.replace(/\\/g, '/').toLowerCase();
+        console.log('Normalized path:', normalizedPath);
+        
+        const isFocusTreeFile = normalizedPath.includes('common/national_focus/') && 
+                               normalizedPath.endsWith('.txt');
+        
+        console.log('Is focus tree file:', isFocusTreeFile);
+        
+        if (isFocusTreeFile) {
+            console.log('Opening focus tree in visual editor');
             this.openFocusTreeEditor(path, name);
             return;
         }
 
-        // Otherwise, open as text file
         if (this.openTabs.has(path)) {
             $(`#tab-${this.hashPath(path)}`).tab('show');
             return;
@@ -424,6 +423,9 @@ class HOI4ModEditor {
     }
 
     openFocusTreeEditor(path, name) {
+        console.log('openFocusTreeEditor called for:', path, name);
+        console.log('FocusEditor available:', typeof FocusEditor);
+        
         if (this.openTabs.has(path)) {
             $(`#tab-${this.hashPath(path)}`).tab('show');
             return;
@@ -432,7 +434,6 @@ class HOI4ModEditor {
         const tabId = `tab-${this.hashPath(path)}`;
         const contentId = `content-${tabId}`;
         
-        // Create tab header
         const tabHeader = $(`
             <li class="nav-item">
                 <a class="nav-link text-light" id="${tabId}" data-bs-toggle="tab" href="#${contentId}">
@@ -450,20 +451,70 @@ class HOI4ModEditor {
         
         $('#editor-tabs').append(tabHeader);
         
-        // Create tab content
         const tabContent = $(`<div class="tab-pane fade h-100" id="${contentId}"></div>`);
         $('#editor-content').append(tabContent);
         
-        // Show the tab and hide welcome
         $('#welcome').removeClass('show active');
         $(`#${tabId}`).tab('show');
         
-        // Initialize the focus tree editor
-        this.openTabs.set(path, {
-            name: name,
-            type: 'focus',
-            editor: new FocusEditor(tabContent, path, name)
-        });
+        try {
+            if (typeof FocusEditor === 'undefined') {
+                throw new Error('FocusEditor class is not defined. Check if focus_editor.js loaded correctly.');
+            }
+            
+            console.log('Creating FocusEditor instance...');
+            const focusEditor = new FocusEditor(tabContent, path, name);
+            
+            this.openTabs.set(path, {
+                name: name,
+                type: 'focus',
+                editor: focusEditor
+            });
+            
+            console.log('FocusTreeEditor initialized successfully');
+            
+        } catch (error) {
+            console.error('Failed to initialize FocusTreeEditor:', error);
+            
+            tabContent.html(`
+                <div class="alert alert-danger m-3">
+                    <h5><i class="bi bi-exclamation-triangle me-2"></i>Visual Editor Failed to Load</h5>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <div class="mb-2">
+                        <small class="text-muted">
+                            Path: ${path}<br>
+                            FocusEditor defined: ${typeof FocusEditor}<br>
+                            Check browser console for details.
+                        </small>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-warning btn-sm" id="load-as-text">
+                            <i class="bi bi-file-text me-1"></i>Load as Text Editor
+                        </button>
+                        <button class="btn btn-info btn-sm" id="reload-page">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Reload Page
+                        </button>
+                    </div>
+                </div>
+            `);
+            
+            tabContent.find('#load-as-text').on('click', () => {
+                this.openTabs.delete(path);
+                $(`#${tabId}`).remove();
+                $(`#${contentId}`).remove();
+                this.openFile(path, name);
+            });
+            
+            tabContent.find('#reload-page').on('click', () => {
+                location.reload();
+            });
+            
+            this.openTabs.set(path, {
+                name: name,
+                type: 'error',
+                error: error.message
+            });
+        }
     }
 
     hashPath(path) {
@@ -475,7 +526,6 @@ class HOI4ModEditor {
         const contentId = `content-${tabId}`;
         const editorId = `editor-${tabId}`;
         
-        // Create tab header
         const tabHeader = $(`
             <li class="nav-item">
                 <a class="nav-link text-light" id="${tabId}" data-bs-toggle="tab" href="#${contentId}">
@@ -493,7 +543,6 @@ class HOI4ModEditor {
         
         $('#editor-tabs').append(tabHeader);
         
-        // Create tab content
         const tabContent = $(`
             <div class="tab-pane fade h-100" id="${contentId}">
                 <div class="d-flex flex-column h-100">
@@ -512,11 +561,9 @@ class HOI4ModEditor {
         
         $('#editor-content').append(tabContent);
         
-        // Show the tab and hide welcome
         $('#welcome').removeClass('show active');
         $(`#${tabId}`).tab('show');
         
-        // Set up save functionality
         this.setupEditorEvents(editorId, path, tabId);
     }
 
@@ -541,7 +588,6 @@ class HOI4ModEditor {
             }
         });
 
-        // Save button click
         saveBtn.on('click', () => {
             this.saveFile(filePath, editor.val(), tabId);
         });
@@ -584,9 +630,18 @@ class HOI4ModEditor {
     }
 
     closeTab(path, tabId) {
-        if (this.unsavedChanges.has(path)) {
-            if (!confirm('You have unsaved changes. Are you sure you want to close this tab?')) {
-                return;
+        const tabData = this.openTabs.get(path);
+        if (tabData && tabData.type === 'focus') {
+            if (this.unsavedChanges.has(path)) {
+                if (!confirm('You have unsaved changes in the focus tree editor. Are you sure you want to close this tab?')) {
+                    return;
+                }
+            }
+        } else {
+            if (this.unsavedChanges.has(path)) {
+                if (!confirm('You have unsaved changes. Are you sure you want to close this tab?')) {
+                    return;
+                }
             }
         }
         
@@ -601,7 +656,27 @@ class HOI4ModEditor {
     }
 }
 
-// Initialize editor when page loads
 $(document).ready(() => {
-    window.editor = new HOI4ModEditor();
+    console.log('Document ready, initializing HOI4ModEditor...');
+    
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap not loaded');
+        alert('Error: Bootstrap JavaScript not loaded. Check CDN connection.');
+        return;
+    }
+    
+    try {
+        window.editor = new HOI4ModEditor();
+        console.log('HOI4ModEditor initialized successfully');
+        
+        if (typeof FocusEditor !== 'undefined') {
+            console.log('✓ FocusEditor class is available');
+        } else {
+            console.warn('✗ FocusEditor class not found - check script loading order');
+        }
+        
+    } catch (error) {
+        console.error('Failed to initialize HOI4ModEditor:', error);
+        alert('Failed to initialize editor: ' + error.message);
+    }
 });
