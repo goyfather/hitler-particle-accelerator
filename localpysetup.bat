@@ -44,9 +44,3 @@ python -m pip --version || (
     pause
     exit /b 1
 )
-
-if exist requirements.txt (
-    echo Installing requirements...
-    python -m pip install -r requirements.txt
-    color 07
-)

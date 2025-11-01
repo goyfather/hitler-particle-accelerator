@@ -484,6 +484,44 @@ def get_available_tags():
     
     return jsonify({'success': True, 'tags': tags})
 
+@main.route('/api/state_editor/get_province_outlines', methods=['POST'])
+def get_province_outlines():
+    """Get vector outlines for all provinces"""
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        # Generate outlines if not already done
+        if not state_editor.province_outlines:
+            success, message = state_editor.generate_province_outlines()
+            if not success:
+                return jsonify({'success': False, 'error': message})
+        
+        return jsonify({
+            'success': True,
+            'outlines': state_editor.province_outlines,
+            'map_width': 5632,  # Standard HOI4 map dimensions
+            'map_height': 2048
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/generate_outlines', methods=['POST'])
+def generate_province_outlines():
+    """Generate province outlines using vectorization"""
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        success, message = state_editor.generate_province_outlines()
+        return jsonify({'success': success, 'message': message})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @main.route('/api/state_editor/save_all', methods=['POST'])
 def save_all_states():
     """Save all modified states"""
@@ -494,6 +532,188 @@ def save_all_states():
     
     success, message = state_editor.save_all_states()
     return jsonify({'success': success, 'message': message})
+
+@main.route('/api/state_editor/update_state', methods=['POST'])
+def update_state():
+    """Update state properties"""
+    data = request.get_json()
+    state_id = data.get('state_id')
+    properties = data.get('properties', {})
+    
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        success, message = state_editor.update_state_properties(state_id, properties)
+        
+        if success:
+            # Save the state immediately
+            state_editor.save_state(state_id)
+        
+        return jsonify({'success': success, 'message': message})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/delete_state', methods=['POST'])
+def delete_state():
+    """Delete a state"""
+    data = request.get_json()
+    state_id = data.get('state_id')
+    
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        if state_id not in state_editor.states:
+            return jsonify({'success': False, 'error': 'State not found'})
+        
+        # Remove the state file
+        state_data = state_editor.states[state_id]
+        filepath = os.path.join(state_editor.states_dir, state_data['file'])
+        
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        # Remove from memory
+        for prov_id in state_data.get('provinces', []):
+            if prov_id in state_editor.province_to_state:
+                del state_editor.province_to_state[prov_id]
+        
+        del state_editor.states[state_id]
+        
+        return jsonify({'success': True, 'message': f'State {state_id} deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/get_province_borders', methods=['POST'])
+def get_province_borders():
+    """Get province border data for rendering"""
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        success, img = state_editor.load_provinces_image()
+        if not success:
+            return jsonify({'success': False, 'error': 'Failed to load provinces image'})
+        
+        # Create a border detection image
+        from PIL import Image, ImageDraw
+        import numpy as np
+        
+        img_array = np.array(img)
+        height, width = img_array.shape[:2]
+        
+        border_img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(border_img)
+        
+        # Detect province borders
+        for y in range(1, height - 1):
+            for x in range(1, width - 1):
+                pixel = tuple(img_array[y, x, :3])
+                
+                # Check 4-directional neighbors
+                neighbors = [
+                    tuple(img_array[y-1, x, :3]),
+                    tuple(img_array[y+1, x, :3]),
+                    tuple(img_array[y, x-1, :3]),
+                    tuple(img_array[y, x+1, :3])
+                ]
+                
+                # If any neighbor is different, this is a border pixel
+                if any(n != pixel for n in neighbors):
+                    # Light gray for province borders
+                    draw.point((x, y), fill=(180, 180, 180, 255))
+        
+        # Convert to base64
+        buffered = BytesIO()
+        border_img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        
+        return jsonify({
+            'success': True,
+            'image': f'data:image/png;base64,{img_str}'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main.route('/api/state_editor/get_state_borders', methods=['POST'])
+def get_state_borders():
+    """Get state border data for rendering"""
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        success, img = state_editor.load_provinces_image()
+        if not success:
+            return jsonify({'success': False, 'error': 'Failed to load provinces image'})
+        
+        from PIL import Image, ImageDraw
+        import numpy as np
+        
+        img_array = np.array(img)
+        height, width = img_array.shape[:2]
+        
+        border_img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(border_img)
+        
+        # Create color to province mapping
+        color_to_province = {}
+        for prov_id, prov_data in state_editor.provinces.items():
+            color = (prov_data['r'], prov_data['g'], prov_data['b'])
+            color_to_province[color] = prov_id
+        
+        # Detect state borders
+        for y in range(1, height - 1):
+            for x in range(1, width - 1):
+                pixel = tuple(img_array[y, x, :3])
+                prov_id = color_to_province.get(pixel)
+                
+                if not prov_id:
+                    continue
+                
+                current_state = state_editor.province_to_state.get(prov_id)
+                
+                # Check 4-directional neighbors
+                neighbors = [
+                    (tuple(img_array[y-1, x, :3]), x, y-1),
+                    (tuple(img_array[y+1, x, :3]), x, y+1),
+                    (tuple(img_array[y, x-1, :3]), x-1, y),
+                    (tuple(img_array[y, x+1, :3]), x+1, y)
+                ]
+                
+                for neighbor_color, nx, ny in neighbors:
+                    neighbor_prov = color_to_province.get(neighbor_color)
+                    if not neighbor_prov:
+                        continue
+                    
+                    neighbor_state = state_editor.province_to_state.get(neighbor_prov)
+                    
+                    # If different states, draw black border
+                    if current_state != neighbor_state:
+                        draw.point((x, y), fill=(0, 0, 0, 255))
+                        break
+        
+        # Convert to base64
+        buffered = BytesIO()
+        border_img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        
+        return jsonify({
+            'success': True,
+            'image': f'data:image/png;base64,{img_str}'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @main.route('/api/save_file', methods=['POST'])
 def save_file():

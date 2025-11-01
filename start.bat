@@ -37,6 +37,12 @@ if not exist "%PYTHON_DIR%\python.exe" (
     )
 )
 
+if exist requirements.txt (
+    echo Installing requirements...
+    %PYTHON_DIR%\python.exe -m pip install --target="%PYTHON_DIR%\Lib\site-packages" -r requirements.txt
+    color 07
+)
+
 echo.
 echo Starting Hitler Particle Accelerator...
 echo The browser should open automatically...
