@@ -589,6 +589,53 @@ def delete_state():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@main.route('/api/state_editor/remove_province_from_state', methods=['POST'])
+def remove_province_from_state():
+    """Remove a province from a state"""
+    data = request.get_json()
+    state_id = data.get('state_id')
+    province_id = data.get('province_id')
+    
+    global state_editor
+    
+    if not state_editor:
+        return jsonify({'success': False, 'error': 'State editor not initialized'})
+    
+    try:
+        # Check if state exists
+        if state_id not in state_editor.states:
+            return jsonify({'success': False, 'error': 'State not found'})
+        
+        # Check if province is in the state
+        if province_id not in state_editor.states[state_id]['provinces']:
+            return jsonify({'success': False, 'error': 'Province not in this state'})
+        
+        # Remove the province
+        state_editor.states[state_id]['provinces'].remove(province_id)
+        
+        # Update province-to-state mapping
+        if province_id in state_editor.province_to_state:
+            del state_editor.province_to_state[province_id]
+        
+        # Regenerate state file content
+        state_editor.states[state_id]['raw_content'] = state_editor.generate_state_content(
+            state_editor.states[state_id]
+        )
+        
+        # Save the state
+        success, message = state_editor.save_state(state_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Province {province_id} removed from state {state_id}'
+            })
+        else:
+            return jsonify({'success': False, 'error': message})
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @main.route('/api/state_editor/get_province_borders', methods=['POST'])
 def get_province_borders():
     """Get province border data for rendering"""

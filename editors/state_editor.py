@@ -320,19 +320,41 @@ class StateEditor:
         return True, "State updated successfully"
     
     def add_province_to_state(self, state_id, province_id):
-        """Add a province to a state"""
+        """Add a province to a state, removing it from any previous state"""
         if state_id not in self.states:
-            return False, "State not found"
+            return False, "Target state not found"
         
-        self.remove_province_from_states(province_id)
+        # Check if province is already in this state
+        if province_id in self.states[state_id]['provinces']:
+            return True, f"Province {province_id} is already in state {state_id}"
         
-        if province_id not in self.states[state_id]['provinces']:
-            self.states[state_id]['provinces'].append(province_id)
-            self.province_to_state[province_id] = state_id
+        # Remove province from old state if it exists
+        old_state_id = self.province_to_state.get(province_id)
+        if old_state_id and old_state_id in self.states:
+            # Remove from old state
+            if province_id in self.states[old_state_id]['provinces']:
+                self.states[old_state_id]['provinces'].remove(province_id)
+                # Regenerate and save old state
+                self.states[old_state_id]['raw_content'] = self.generate_state_content(
+                    self.states[old_state_id]
+                )
+                self.save_state(old_state_id)
+                print(f"Removed province {province_id} from state {old_state_id}")
         
+        # Add to new state
+        self.states[state_id]['provinces'].append(province_id)
+        self.province_to_state[province_id] = state_id
+        
+        # Regenerate new state content
         self.states[state_id]['raw_content'] = self.generate_state_content(self.states[state_id])
         
-        return True, "Province added to state"
+        # Save new state
+        success, message = self.save_state(state_id)
+        
+        if success:
+            return True, f"Province {province_id} moved to state {state_id}"
+        else:
+            return False, f"Failed to save state: {message}"
     
     def remove_province_from_states(self, province_id):
         """Remove a province from any state it belongs to"""

@@ -9,7 +9,10 @@ class StateEditorGUI {
         this.provinceToState = {};
         this.countryColors = {};
         this.selectedState = null;
-        this.mode = 'view';
+        
+        // FIXED: Three distinct click modes
+        this.clickMode = 'view'; // 'view', 'add_province', 'remove_province'
+        
         this.currentOwnerTag = null;
         this.zoom = 1.0;
         this.panX = 0;
@@ -25,7 +28,6 @@ class StateEditorGUI {
         this.stateBordersImage = null;
         this.showStateBorders = true;
         this.showProvinceBorders = true;
-        this.editingState = null;
         
         // PERFORMANCE: Cache rendered layers
         this.cachedLayers = {
@@ -245,7 +247,7 @@ class StateEditorGUI {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
             
-            // NEW: Track which provinces belong to selected state
+            // Track which provinces belong to selected state
             const selectedProvinces = new Set();
             if (this.selectedState) {
                 this.selectedState.provinces.forEach(p => selectedProvinces.add(p));
@@ -300,7 +302,7 @@ class StateEditorGUI {
                             data[i + 2] = baseColor[2];
                         }
                     } else if (province.type === 'sea') {
-                        // FIX: Much darker ocean
+                        // Much darker ocean
                         data[i] = 30;
                         data[i + 1] = 50;
                         data[i + 2] = 80;
@@ -344,7 +346,7 @@ class StateEditorGUI {
             const data = imageData.data;
             const borderData = ctx.createImageData(canvas.width, canvas.height);
             
-            // FIX: Thinner borders - only draw on certain pixels
+            // Thinner borders - only draw on certain pixels
             for (let y = 1; y < canvas.height - 1; y++) {
                 for (let x = 1; x < canvas.width - 1; x++) {
                     const idx = (y * canvas.width + x) * 4;
@@ -367,9 +369,9 @@ class StateEditorGUI {
                             const nProvinceId = this.colorMap[nColorKey];
                             
                             if (nProvinceId && nProvinceId !== provinceId) {
-                                borderData.data[idx] = 140;
-                                borderData.data[idx + 1] = 140;
-                                borderData.data[idx + 2] = 140;
+                                borderData.data[idx] = 110;
+                                borderData.data[idx + 1] = 110;
+                                borderData.data[idx + 2] = 110;
                                 borderData.data[idx + 3] = 200; // Slightly transparent
                                 break;
                             }
@@ -473,39 +475,54 @@ class StateEditorGUI {
                                 <!-- Toolbar -->
                                 <div class="bg-dark border-end border-secondary p-3" style="width: 300px; overflow-y: auto;">
                                     <h6><i class="bi bi-tools me-2"></i>Tools</h6>
-                                    <div class="btn-group-vertical w-100 mb-3">
-                                        <button class="btn btn-outline-light btn-sm mode-btn active" data-mode="view">
-                                            <i class="bi bi-eye me-1"></i>View Mode
-                                        </button>
-                                        <button class="btn btn-outline-warning btn-sm mode-btn" data-mode="edit_borders">
-                                            <i class="bi bi-pencil me-1"></i>Edit State Borders
-                                        </button>
-                                        <button class="btn btn-outline-info btn-sm mode-btn" data-mode="paint_owner">
-                                            <i class="bi bi-brush me-1"></i>Paint Owner
-                                        </button>
-                                    </div>
                                     
                                     <button class="btn btn-success w-100 mb-3" id="create-new-state-btn">
                                         <i class="bi bi-plus-circle me-1"></i>Create New State
                                     </button>
                                     
-                                    <!-- Edit Borders Panel -->
-                                    <div id="edit-borders-panel" style="display: none;">
-                                        <div class="alert alert-info">
-                                            <small>
-                                                <strong>Edit State Borders Mode:</strong><br>
-                                                Click a province to select/view its state.<br>
-                                                Use buttons below to modify.
-                                            </small>
+                                    <!-- Selected State Info -->
+                                    <div id="selected-state-panel" class="mb-3">
+                                        <div class="text-muted small">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            Click a province to select its state
                                         </div>
-                                        <div id="selected-state-info"></div>
                                     </div>
                                     
-                                    <div id="owner-selector" style="display: none;">
-                                        <h6><i class="bi bi-flag me-1"></i>Select Owner</h6>
+                                    <!-- Click Mode Buttons - Only shown when state is selected -->
+                                    <div id="click-mode-buttons" style="display: none;">
+                                        <h6 class="mt-3"><i class="bi bi-mouse me-1"></i>Click Mode</h6>
+                                        <div class="btn-group-vertical w-100 mb-3">
+                                            <button class="btn btn-outline-light btn-sm click-mode-btn active" data-mode="view">
+                                                <i class="bi bi-eye me-1"></i>View Mode
+                                            </button>
+                                            <button class="btn btn-outline-success btn-sm click-mode-btn" data-mode="add_province">
+                                                <i class="bi bi-plus-square me-1"></i>Add Province to State
+                                            </button>
+                                            <button class="btn btn-outline-warning btn-sm click-mode-btn" data-mode="remove_province">
+                                                <i class="bi bi-dash-square me-1"></i>Remove Province from State
+                                            </button>
+                                        </div>
+                                        
+                                        <button class="btn btn-secondary w-100 mb-2" id="deselect-state-btn">
+                                            <i class="bi bi-x-circle me-1"></i>Deselect State
+                                        </button>
+                                        
+                                        <button class="btn btn-danger w-100" id="delete-current-state">
+                                            <i class="bi bi-trash me-1"></i>Delete State
+                                        </button>
+                                    </div>
+                                    
+                                    <hr class="border-secondary my-3">
+                                    
+                                    <!-- Paint Owner Tool -->
+                                    <div id="owner-selector">
+                                        <h6><i class="bi bi-flag me-1"></i>Paint Owner</h6>
                                         <select class="form-select form-select-sm bg-dark text-light border-secondary mb-2" id="owner-tag-select">
-                                            <option value="">Loading...</option>
+                                            <option value="">Select tag...</option>
                                         </select>
+                                        <button class="btn btn-info btn-sm w-100 mb-3" id="paint-owner-btn">
+                                            <i class="bi bi-brush me-1"></i>Paint Selected State
+                                        </button>
                                     </div>
                                     
                                     <div class="mt-3">
@@ -539,7 +556,8 @@ class StateEditorGUI {
                                         <div id="province-info"></div>
                                     </div>
                                     <div class="position-absolute top-0 end-0 p-2 bg-dark bg-opacity-75 text-light small">
-                                        Mode: <span id="current-mode">View</span> | Zoom: <span id="zoom-level">100%</span>
+                                        <div id="click-mode-display">Mode: <strong>View</strong></div>
+                                        <div>Zoom: <span id="zoom-level">100%</span></div>
                                     </div>
                                 </div>
                                 
@@ -578,13 +596,13 @@ class StateEditorGUI {
     }
 
     setupEventListeners() {
-        $('.mode-btn').on('click', (e) => {
+        // Click mode buttons
+        $('.click-mode-btn').on('click', (e) => {
             const mode = $(e.currentTarget).data('mode');
-            this.setMode(mode);
-            $('.mode-btn').removeClass('active');
-            $(e.currentTarget).addClass('active');
+            this.setClickMode(mode);
         });
         
+        // Canvas events
         this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
@@ -592,6 +610,7 @@ class StateEditorGUI {
         this.canvas.addEventListener('click', (e) => this.handleClick(e));
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         
+        // Buttons
         $('#save-all-states').on('click', () => this.saveAllStates());
         $('#close-state-editor').on('click', () => {
             this.modal.hide();
@@ -599,6 +618,19 @@ class StateEditorGUI {
         });
         
         $('#create-new-state-btn').on('click', () => this.showCreateStateModal());
+        
+        $('#deselect-state-btn').on('click', () => {
+            this.selectedState = null;
+            this.setClickMode('view');
+            this.updateSelectedStatePanel();
+            this.renderPropertiesPanel();
+            this.layersDirty.stylized = true;
+            this.render();
+        });
+        
+        $('#delete-current-state').on('click', () => this.deleteCurrentState());
+        
+        $('#paint-owner-btn').on('click', () => this.paintOwnerOnSelectedState());
         
         $('#show-province-borders').on('change', (e) => {
             this.showProvinceBorders = e.target.checked;
@@ -611,67 +643,51 @@ class StateEditorGUI {
         });
     }
 
-    setMode(mode) {
-        this.mode = mode;
-        $('#current-mode').text(this.getModeDisplayName(mode));
+    setClickMode(mode) {
+        this.clickMode = mode;
         
-        // Show/hide panels based on mode
-        if (mode === 'edit_borders') {
-            $('#edit-borders-panel').show();
-            $('#owner-selector').hide();
-        } else if (mode === 'paint_owner') {
-            $('#edit-borders-panel').hide();
-            $('#owner-selector').show();
-        } else {
-            $('#edit-borders-panel').hide();
-            $('#owner-selector').hide();
-        }
+        // Update button states
+        $('.click-mode-btn').removeClass('active');
+        $(`.click-mode-btn[data-mode="${mode}"]`).addClass('active');
         
+        // Update display
+        const modeNames = {
+            'view': 'View',
+            'add_province': 'Add Province to State ' + (this.selectedState ? this.selectedState.id : ''),
+            'remove_province': 'Remove Province from State ' + (this.selectedState ? this.selectedState.id : '')
+        };
+        
+        $('#click-mode-display').html(`Mode: <strong>${modeNames[mode]}</strong>`);
+        
+        // Update cursor
         if (mode === 'view') {
             this.canvas.style.cursor = 'grab';
-        } else if (mode === 'edit_borders') {
-            this.canvas.style.cursor = 'crosshair';
-        } else if (mode === 'paint_owner') {
-            this.canvas.style.cursor = 'cell';
+        } else if (mode === 'add_province') {
+            this.canvas.style.cursor = 'copy';
         } else if (mode === 'remove_province') {
             this.canvas.style.cursor = 'not-allowed';
         }
         
-        // Clear selection when changing modes (except remove_province)
-        if (mode !== 'remove_province') {
-            this.selectedState = null;
-            this.updateSelectedStateInfo();
-        }
-    }
-
-    getModeDisplayName(mode) {
-        const names = {
-            'view': 'View',
-            'edit_borders': 'Edit State Borders',
-            'paint_owner': 'Paint Owner',
-            'remove_province': 'Remove Province'
-        };
-        return names[mode] || mode;
-    }
-
-    async loadAvailableTags() {
-        const response = await fetch('/api/state_editor/get_available_tags', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success && result.tags.length > 0) {
-            const select = $('#owner-tag-select');
-            select.empty();
-            select.append('<option value="">Select tag...</option>');
-            result.tags.forEach(tag => {
-                select.append(`<option value="${tag}">${tag}</option>`);
-            });
+        // Show/hide mode notification
+        $('#mode-notification').remove();
+        if (mode !== 'view' && this.selectedState) {
+            const modeText = mode === 'add_province' 
+                ? `Click any province to ADD it to State ${this.selectedState.id}` 
+                : `Click any province in State ${this.selectedState.id} to REMOVE it`;
             
-            select.on('change', (e) => {
-                this.currentOwnerTag = $(e.target).val();
+            $('body').append(`
+                <div class="alert alert-${mode === 'add_province' ? 'success' : 'warning'} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3" 
+                     style="z-index: 9999; max-width: 600px;" id="mode-notification">
+                    <strong>${modeNames[mode]}</strong><br>
+                    ${modeText}<br>
+                    <button type="button" class="btn btn-sm btn-secondary mt-2" id="cancel-mode">
+                        Return to View Mode
+                    </button>
+                </div>
+            `);
+            
+            $('#cancel-mode').on('click', () => {
+                this.setClickMode('view');
             });
         }
     }
@@ -709,7 +725,7 @@ class StateEditorGUI {
 
     handleMouseUp(e) {
         this.isDragging = false;
-        this.setMode(this.mode);
+        this.setClickMode(this.clickMode);
     }
 
     handleWheel(e) {
@@ -742,7 +758,7 @@ class StateEditorGUI {
     }
 
     async handleClick(e) {
-        if (this.mode === 'view') return;
+        if (this.isDragging) return;
         
         const rect = this.canvas.getBoundingClientRect();
         const mouseX = Math.floor((e.clientX - rect.left - this.panX) / this.zoom);
@@ -751,123 +767,341 @@ class StateEditorGUI {
         const provinceId = this.getProvinceAtPixel(mouseX, mouseY);
         
         if (!provinceId) {
-            $('#province-info').html('<span class="text-warning">No province</span>');
+            $('#province-info').html('<span class="text-warning">No province at cursor</span>');
             return;
         }
         
-        // Check if it's a sea/lake province
         const province = this.provinces[provinceId];
         if (province && (province.type === 'sea' || province.type === 'lake')) {
-            $('#province-info').html(`<span class="text-danger">Cannot assign ${province.type} provinces to states!</span>`);
+            $('#province-info').html(`<span class="text-danger">Cannot use ${province.type} provinces!</span>`);
             return;
         }
         
         const stateId = this.provinceToState[provinceId];
         
-        this.updateProvinceInfo(provinceId, stateId);
-        
-        // FIX: Handle remove province mode
-        if (this.mode === 'remove_province') {
-            if (!this.selectedState) {
-                alert('No state selected');
-                return;
-            }
-            
-            if (stateId !== this.selectedState.id) {
-                alert(`Province ${provinceId} is not in the selected state ${this.selectedState.id}`);
-                return;
-            }
-            
-            if (!confirm(`Remove province ${provinceId} from state ${stateId}?`)) {
-                return;
-            }
-            
-            const response = await fetch('/api/state_editor/remove_province_from_state', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state_id: stateId, province_id: provinceId })
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-                $('#remove-mode-alert').remove();
-                this.setMode('edit_borders');
-                this.layersDirty.stateBorders = true;
-                await this.quickRefreshData();
-                $('#province-info').html(`<span class="text-success">Province ${provinceId} removed from state ${stateId}</span>`);
-            } else {
-                alert('Error: ' + result.message);
-            }
-            return;
-        }
-        
-        if (this.mode === 'edit_borders') {
-            await this.handleBorderEditClick(provinceId, stateId);
-        } else if (this.mode === 'paint_owner') {
-            await this.handlePaintOwner(provinceId, stateId);
+        // Handle different click modes
+        if (this.clickMode === 'view') {
+            // View mode - select state
+            await this.handleViewModeClick(provinceId, stateId);
+        } else if (this.clickMode === 'add_province') {
+            // Add province mode
+            await this.handleAddProvinceClick(provinceId, stateId);
+        } else if (this.clickMode === 'remove_province') {
+            // Remove province mode
+            await this.handleRemoveProvinceClick(provinceId, stateId);
         }
     }
 
-    // FIX ISSUE 2: Proper edit borders mode with IMPROVED WORKFLOW
-    async handleBorderEditClick(provinceId, stateId) {
-        // NEW WORKFLOW: If state is selected, add province to it
-        if (this.selectedState) {
-            // Adding province to selected state
-            if (stateId === this.selectedState.id) {
-                // Already in this state
-                $('#province-info').html(`<span class="text-info">Province ${provinceId} is already in State ${stateId}</span>`);
-                return;
-            }
-            
-            const response = await fetch('/api/state_editor/add_province_to_state', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state_id: this.selectedState.id, province_id: provinceId })
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-                this.layersDirty.stateBorders = true;
-                await this.quickRefreshData();
-                $('#province-info').html(`<span class="text-success">Province ${provinceId} added to State ${this.selectedState.id}</span>`);
-            }
-            return;
-        }
+    async handleViewModeClick(provinceId, stateId) {
+        this.updateProvinceInfo(provinceId, stateId);
         
-        // No state selected - if province has no state, show dialog
         if (!stateId) {
+            // Unassigned province - show assignment dialog
             this.showProvinceAssignmentDialog(provinceId);
             return;
         }
         
-        // Province has a state - select it
+        // Select the state
         this.selectedState = this.states[stateId];
-        this.updateSelectedStateInfo();
+        this.updateSelectedStatePanel();
         this.renderPropertiesPanel();
+        
+        // Mark stylized layer dirty to show selection
+        this.layersDirty.stylized = true;
+        await this.createStylizedMap();
+        this.render();
     }
 
-    // FIX: Paint owner SHOULD mark stylized layer dirty
-    async handlePaintOwner(provinceId, stateId) {
-        if (!this.currentOwnerTag) {
-            alert('Please select an owner tag first');
+    async handleAddProvinceClick(provinceId, stateId) {
+        if (!this.selectedState) {
+            alert('No state selected. This should not happen.');
             return;
         }
-        if (!stateId) {
-            alert('Province not in a state. Use Edit State Borders mode first.');
+        
+        // Check if province is already in this state
+        if (stateId === this.selectedState.id) {
+            $('#province-info').html(`<span class="text-info">Province ${provinceId} is already in State ${stateId}</span>`);
+            return;
+        }
+        
+        // Add province to selected state
+        const response = await fetch('/api/state_editor/add_province_to_state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                state_id: this.selectedState.id, 
+                province_id: provinceId 
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            $('#province-info').html(`<span class="text-success">✓ Province ${provinceId} added to State ${this.selectedState.id}</span>`);
+            
+            // Refresh data and visuals
+            this.layersDirty.stylized = true;
+            this.layersDirty.stateBorders = true;
+            await this.quickRefreshData();
+            
+            // Stay in add mode for convenience
+        } else {
+            alert('Error: ' + result.message);
+        }
+    }
+
+    async handleRemoveProvinceClick(provinceId, stateId) {
+        if (!this.selectedState) {
+            alert('No state selected. This should not happen.');
+            return;
+        }
+        
+        // Check if province is in the selected state
+        if (stateId !== this.selectedState.id) {
+            $('#province-info').html(`<span class="text-warning">Province ${provinceId} is not in State ${this.selectedState.id}</span>`);
+            return;
+        }
+        
+        // Confirm removal
+        if (!confirm(`Remove province ${provinceId} from state ${stateId}?`)) {
+            return;
+        }
+        
+        // Remove province from state
+        const response = await fetch('/api/state_editor/remove_province_from_state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                state_id: stateId, 
+                province_id: provinceId 
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            $('#province-info').html(`<span class="text-success">✓ Province ${provinceId} removed from State ${stateId}</span>`);
+            
+            // Refresh data and visuals
+            this.layersDirty.stylized = true;
+            this.layersDirty.stateBorders = true;
+            await this.quickRefreshData();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    }
+
+    updateSelectedStatePanel() {
+        const panel = $('#selected-state-panel');
+        
+        if (!this.selectedState) {
+            panel.html(`
+                <div class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Click a province to select its state
+                </div>
+            `);
+            $('#click-mode-buttons').hide();
+            return;
+        }
+        
+        const state = this.selectedState;
+        panel.html(`
+            <div class="alert alert-primary mb-0">
+                <strong><i class="bi bi-check-circle me-1"></i>State ${state.id} Selected</strong><br>
+                <small>
+                    Name: ${state.name || 'Unnamed'}<br>
+                    Owner: ${state.owner || 'None'}<br>
+                    Provinces: ${state.provinces.length}
+                </small>
+            </div>
+        `);
+        
+        $('#click-mode-buttons').show();
+    }
+
+    updateProvinceInfo(provinceId, stateId) {
+        let info = `Province: <strong>${provinceId}</strong>`;
+        
+        if (provinceId in this.provinces) {
+            const province = this.provinces[provinceId];
+            info += ` (${province.type})`;
+        }
+        
+        if (stateId) {
+            const state = this.states[stateId];
+            info += ` | State: <strong>${stateId}</strong>`;
+            if (state) {
+                info += ` (${state.name})`;
+                info += ` | Owner: <strong>${state.owner || 'None'}</strong>`;
+            }
+        } else {
+            info += ` | <span class="text-warning">Unassigned</span>`;
+        }
+        
+        $('#province-info').html(info);
+    }
+
+    updateMouseInfo(mouseX, mouseY) {
+        const worldX = Math.floor((mouseX - this.panX) / this.zoom);
+        const worldY = Math.floor((mouseY - this.panY) / this.zoom);
+        
+        const provinceId = this.getProvinceAtPixel(worldX, worldY);
+        let provinceText = '';
+        if (provinceId) {
+            provinceText = ` | Province: ${provinceId}`;
+        }
+        
+        $('#mouse-info').text(`World: ${worldX}, ${worldY}${provinceText}`);
+    }
+
+    getProvinceAtPixel(x, y) {
+        if (!this.offscreenCtx || x < 0 || y < 0 || 
+            x >= this.offscreenCanvas.width || y >= this.offscreenCanvas.height) {
+            return null;
+        }
+        
+        const pixelData = this.offscreenCtx.getImageData(x, y, 1, 1).data;
+        const colorKey = `${pixelData[0]},${pixelData[1]},${pixelData[2]}`;
+        
+        return this.colorMap[colorKey];
+    }
+
+    render() {
+        if (!this.ctx) return;
+        
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.save();
+        this.ctx.translate(this.panX, this.panY);
+        this.ctx.scale(this.zoom, this.zoom);
+        
+        if (this.cachedLayers.stylized) {
+            this.ctx.drawImage(this.cachedLayers.stylized, 0, 0);
+        }
+        
+        if (this.showProvinceBorders && this.cachedLayers.provinceBorders) {
+            this.ctx.drawImage(this.cachedLayers.provinceBorders, 0, 0);
+        }
+        
+        if (this.showStateBorders && this.cachedLayers.stateBorders) {
+            this.ctx.drawImage(this.cachedLayers.stateBorders, 0, 0);
+        }
+        
+        this.ctx.restore();
+    }
+
+    async quickRefreshData() {
+        console.log('Quick refresh - updating data only...');
+        
+        const initResponse = await fetch('/api/state_editor/initialize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const initResult = await initResponse.json();
+        
+        this.states = {};
+        this.provinceToState = {};
+        initResult.states.forEach(state => {
+            this.states[state.id] = state;
+            state.provinces.forEach(provinceId => {
+                this.provinceToState[provinceId] = state.id;
+            });
+        });
+        
+        // Only regenerate layers that are dirty
+        if (this.layersDirty.stylized) {
+            await this.createStylizedMap();
+        }
+        if (this.layersDirty.stateBorders) {
+            await this.createStateBorders();
+        }
+        
+        this.render();
+        
+        if (this.selectedState && this.states[this.selectedState.id]) {
+            this.selectedState = this.states[this.selectedState.id];
+            this.renderPropertiesPanel();
+        }
+    }
+
+    async loadAvailableTags() {
+        const response = await fetch('/api/state_editor/get_available_tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.tags.length > 0) {
+            const select = $('#owner-tag-select');
+            select.empty();
+            select.append('<option value="">Select tag...</option>');
+            result.tags.forEach(tag => {
+                select.append(`<option value="${tag}">${tag}</option>`);
+            });
+            
+            select.on('change', (e) => {
+                this.currentOwnerTag = $(e.target).val();
+            });
+        }
+    }
+
+    async paintOwnerOnSelectedState() {
+        if (!this.selectedState) {
+            alert('Please select a state first');
+            return;
+        }
+        
+        const ownerTag = $('#owner-tag-select').val();
+        if (!ownerTag) {
+            alert('Please select an owner tag');
             return;
         }
         
         const response = await fetch('/api/state_editor/set_state_owner', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state_id: stateId, owner_tag: this.currentOwnerTag })
+            body: JSON.stringify({ 
+                state_id: this.selectedState.id, 
+                owner_tag: ownerTag 
+            })
         });
         
         const result = await response.json();
         if (result.success) {
-            // FIX: Mark stylized layer as dirty since owner changed
+            $('#province-info').html(`<span class="text-success">✓ State ${this.selectedState.id} owner set to ${ownerTag}</span>`);
             this.layersDirty.stylized = true;
             await this.quickRefreshData();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    }
+
+    async deleteCurrentState() {
+        if (!this.selectedState) return;
+        
+        const state = this.selectedState;
+        if (!confirm(`Delete state ${state.id}? All provinces will become unassigned.`)) {
+            return;
+        }
+        
+        const response = await fetch('/api/state_editor/delete_state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state_id: state.id })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            this.selectedState = null;
+            this.setClickMode('view');
+            this.layersDirty.stylized = true;
+            this.layersDirty.stateBorders = true;
+            await this.quickRefreshData();
+            this.updateSelectedStatePanel();
+            this.renderPropertiesPanel();
+        } else {
+            alert('Error: ' + result.error);
         }
     }
 
@@ -972,7 +1206,7 @@ class StateEditorGUI {
                     this.layersDirty.stateBorders = true;
                     await this.quickRefreshData();
                     this.selectedState = this.states[result.state_id];
-                    this.updateSelectedStateInfo();
+                    this.updateSelectedStatePanel();
                     this.renderPropertiesPanel();
                 }
             } else {
@@ -995,209 +1229,13 @@ class StateEditorGUI {
                     this.layersDirty.stateBorders = true;
                     await this.quickRefreshData();
                     this.selectedState = this.states[targetStateId];
-                    this.updateSelectedStateInfo();
+                    this.updateSelectedStatePanel();
                     this.renderPropertiesPanel();
                 }
             }
         });
         
         modal.show();
-    }
-
-    updateSelectedStateInfo() {
-        const panel = $('#selected-state-info');
-        
-        if (!this.selectedState) {
-            panel.html(`
-                <div class="text-muted">
-                    <small>No state selected. Click a province to select its state, or click unassigned provinces to add them to a new state.</small>
-                </div>
-            `);
-            return;
-        }
-        
-        const state = this.selectedState;
-        panel.html(`
-            <div class="alert alert-success">
-                <strong>Selected State ${state.id}</strong><br>
-                Name: ${state.name || 'Unnamed'}<br>
-                Owner: ${state.owner || 'None'}<br>
-                Provinces: ${state.provinces.length}
-            </div>
-            <div class="alert alert-info">
-                <small><strong>Tip:</strong> Click unassigned provinces to add them to this state!</small>
-            </div>
-            <button class="btn btn-sm btn-warning w-100 mb-2" id="remove-province-mode-btn">
-                <i class="bi bi-dash-circle me-1"></i>Remove Province Mode
-            </button>
-            <button class="btn btn-sm btn-secondary w-100 mb-2" id="deselect-state-btn">
-                <i class="bi bi-x-circle me-1"></i>Deselect State
-            </button>
-            <button class="btn btn-sm btn-danger w-100" id="delete-current-state">
-                <i class="bi bi-trash me-1"></i>Delete State
-            </button>
-        `);
-        
-        // FIX: Remove province mode that actually works
-        $('#remove-province-mode-btn').on('click', () => {
-            this.mode = 'remove_province';
-            $('#remove-province-mode-btn').addClass('active btn-danger').removeClass('btn-warning');
-            this.canvas.style.cursor = 'not-allowed';
-            $('#current-mode').text('Remove Province from State ' + state.id);
-            
-            // Show notification
-            $('body').append(`
-                <div class="alert alert-warning alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3" 
-                     style="z-index: 9999; max-width: 500px;" id="remove-mode-alert">
-                    <strong>Remove Province Mode Active</strong><br>
-                    Click any province in State ${state.id} to remove it from the state.<br>
-                    <button type="button" class="btn btn-sm btn-secondary mt-2" id="cancel-remove-mode">Cancel</button>
-                </div>
-            `);
-            
-            $('#cancel-remove-mode').on('click', () => {
-                this.setMode('edit_borders');
-                $('#remove-mode-alert').remove();
-            });
-        });
-        
-        $('#deselect-state-btn').on('click', () => {
-            this.selectedState = null;
-            this.updateSelectedStateInfo();
-            this.renderPropertiesPanel();
-            this.layersDirty.stylized = true; // Remove highlight
-            this.render();
-        });
-        
-        $('#delete-current-state').on('click', async () => {
-            if (!confirm(`Delete state ${state.id}? All provinces will become unassigned.`)) {
-                return;
-            }
-            
-            const response = await fetch('/api/state_editor/delete_state', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state_id: state.id })
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-                this.selectedState = null;
-                this.layersDirty.stylized = true;
-                this.layersDirty.stateBorders = true;
-                await this.quickRefreshData();
-                this.updateSelectedStateInfo();
-                this.renderPropertiesPanel();
-            } else {
-                alert('Error: ' + result.error);
-            }
-        });
-    }
-
-    getProvinceAtPixel(x, y) {
-        if (!this.offscreenCtx || x < 0 || y < 0 || 
-            x >= this.offscreenCanvas.width || y >= this.offscreenCanvas.height) {
-            return null;
-        }
-        
-        const pixelData = this.offscreenCtx.getImageData(x, y, 1, 1).data;
-        const colorKey = `${pixelData[0]},${pixelData[1]},${pixelData[2]}`;
-        
-        return this.colorMap[colorKey];
-    }
-
-    updateProvinceInfo(provinceId, stateId) {
-        let info = `Province: <strong>${provinceId}</strong>`;
-        
-        if (provinceId in this.provinces) {
-            const province = this.provinces[provinceId];
-            info += ` (${province.type})`;
-        }
-        
-        if (stateId) {
-            const state = this.states[stateId];
-            info += ` | State: <strong>${stateId}</strong>`;
-            if (state) {
-                info += ` (${state.name})`;
-                info += ` | Owner: <strong>${state.owner || 'None'}</strong>`;
-            }
-        } else {
-            info += ` | <span class="text-warning">No state</span>`;
-        }
-        
-        $('#province-info').html(info);
-    }
-
-    updateMouseInfo(mouseX, mouseY) {
-        const worldX = Math.floor((mouseX - this.panX) / this.zoom);
-        const worldY = Math.floor((mouseY - this.panY) / this.zoom);
-        
-        const provinceId = this.getProvinceAtPixel(worldX, worldY);
-        let provinceText = '';
-        if (provinceId) {
-            provinceText = ` | Province: ${provinceId}`;
-        }
-        
-        $('#mouse-info').text(`World: ${worldX}, ${worldY}${provinceText}`);
-    }
-
-    render() {
-        if (!this.ctx) return;
-        
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        this.ctx.save();
-        this.ctx.translate(this.panX, this.panY);
-        this.ctx.scale(this.zoom, this.zoom);
-        
-        if (this.cachedLayers.stylized) {
-            this.ctx.drawImage(this.cachedLayers.stylized, 0, 0);
-        }
-        
-        if (this.showProvinceBorders && this.cachedLayers.provinceBorders) {
-            this.ctx.drawImage(this.cachedLayers.provinceBorders, 0, 0);
-        }
-        
-        if (this.showStateBorders && this.cachedLayers.stateBorders) {
-            this.ctx.drawImage(this.cachedLayers.stateBorders, 0, 0);
-        }
-        
-        this.ctx.restore();
-    }
-
-    async quickRefreshData() {
-        console.log('Quick refresh - updating data only...');
-        
-        const initResponse = await fetch('/api/state_editor/initialize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const initResult = await initResponse.json();
-        
-        this.states = {};
-        this.provinceToState = {};
-        initResult.states.forEach(state => {
-            this.states[state.id] = state;
-            state.provinces.forEach(provinceId => {
-                this.provinceToState[provinceId] = state.id;
-            });
-        });
-        
-        // Only regenerate layers that are dirty
-        if (this.layersDirty.stylized) {
-            await this.createStylizedMap();
-        }
-        if (this.layersDirty.stateBorders) {
-            await this.createStateBorders();
-        }
-        
-        this.render();
-        
-        if (this.selectedState && this.states[this.selectedState.id]) {
-            this.selectedState = this.states[this.selectedState.id];
-            this.renderPropertiesPanel();
-        }
     }
 
     renderPropertiesPanel() {
@@ -1340,7 +1378,7 @@ class StateEditorGUI {
             }
         });
         
-        // Collect buildings (including arms_factory!)
+        // Collect buildings
         $('.building-input').each((i, el) => {
             const bld = $(el).data('building');
             const val = parseInt($(el).val());
