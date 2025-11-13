@@ -8,6 +8,7 @@ class HOI4ModEditor {
         
         this.initCountryEditor();
         this.initFocusTreeEditor();
+	this.initIdeologyEditor();
         this.initEventListeners();
         
         console.log('HOI4ModEditor initialized');
@@ -99,6 +100,58 @@ class HOI4ModEditor {
         $('#create-country-btn').on('click', () => this.openCountryCreator());
         $('#confirm-country-create').on('click', () => this.createCountry());
         $('#country-color-picker').on('input', (e) => this.updateColorPreview(e.target.value));
+    }
+
+initIdeologyEditor() {
+        // Add button to navbar
+        const navbarButtons = $('<div class="navbar-buttons ms-3"></div>');
+        $('.navbar-brand').after(navbarButtons);
+
+        const ideologyButton = $(`
+            <button class="btn btn-outline-light btn-sm me-2" id="create-ideologies-btn">
+                <i class="bi bi-journal-plus me-1"></i>Create Ideologies
+            </button>
+        `);
+        navbarButtons.append(ideologyButton);
+
+        ideologyButton.on('click', () => this.createIdeologiesFile());
+    }
+
+    async createIdeologiesFile() {
+        if (!this.currentProject) {
+            alert('Please open a project first!');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/create_ideologies_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+    
+            const result = await response.json();
+        
+            if (result.success) {
+                alert(`Success: ${result.message}`);
+                // Refresh file tree to show new files
+                if (this.currentProject) {
+                    const response = await fetch('/api/open_project', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ path: this.currentProject })
+                    });
+                
+                    const result = await response.json();
+                    if (result.success) {
+                        this.renderFileTree(result.structure);
+                    }
+                }
+            } else {
+                alert(`Error: ${result.message}`);
+            }
+        } catch (error) {
+            alert('Failed to create ideologies file: ' + error.message);
+        }
     }
 
     initFocusTreeEditor() {
@@ -397,6 +450,14 @@ class HOI4ModEditor {
             this.openFocusTreeEditor(path, name);
             return;
         }
+        const isIdeologiesFile = normalizedPath.includes('common/ideologies/') && 
+                               normalizedPath.endsWith('.txt');
+
+        if (isIdeologiesFile) {
+            console.log('Opening ideologies file in visual editor');
+            this.openIdeologyEditor(path, name);
+            return;
+        }
 
         if (this.openTabs.has(path)) {
             $(`#tab-${this.hashPath(path)}`).tab('show');
@@ -419,6 +480,57 @@ class HOI4ModEditor {
             });
         } else {
             alert('Error opening file: ' + result.error);
+        }
+    }
+
+    openIdeologyEditor(path, name) {
+        if (this.openTabs.has(path)) {
+            $(`#tab-${this.hashPath(path)}`).tab('show');
+            return;
+        }
+
+        const tabId = `tab-${this.hashPath(path)}`;
+        const contentId = `content-${tabId}`;
+    
+        const tabHeader = $(`
+            <li class="nav-item">
+                <a class="nav-link text-light" id="${tabId}" data-bs-toggle="tab" href="#${contentId}">
+                    <i class="bi bi-journal-text me-1"></i>${name}
+                    <span class="unsaved-indicator text-warning ms-1" style="display: none;">•</span>
+                    <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.7rem;"></button>
+                </a>
+            </li>
+        `);
+    
+        tabHeader.find('.btn-close').on('click', (e) => {
+            e.stopPropagation();
+            this.closeTab(path, tabId);
+        });
+    
+        $('#editor-tabs').append(tabHeader);
+    
+        const tabContent = $(`<div class="tab-pane fade h-100" id="${contentId}"></div>`);
+        $('#editor-content').append(tabContent);
+    
+        $('#welcome').removeClass('show active');
+        $(`#${tabId}`).tab('show');
+    
+        try {
+            const ideologyEditor = new IdeologyEditor(tabContent, path, name);
+            
+            this.openTabs.set(path, {
+                name: name,
+                type: 'ideology',
+                editor: ideologyEditor
+            });
+        
+        } catch (error) {
+            console.error('Failed to initialize IdeologyEditor:', error);
+            // Fallback to text editor
+            this.openTabs.delete(path);
+            $(`#${tabId}`).remove();
+            $(`#${contentId}`).remove();
+            this.openFile(path, name);
         }
     }
 
