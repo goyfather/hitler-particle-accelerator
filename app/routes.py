@@ -589,6 +589,40 @@ def delete_state():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@main.route('/api/create_ideologies_file', methods=['POST'])
+def create_ideologies_file():
+    """Create empty ideologies file and localization"""
+    if not project_manager.current_project:
+        return jsonify({'success': False, 'error': 'No project loaded'})
+    
+    try:
+        # Create common/ideologies directory
+        ideologies_dir = os.path.join(project_manager.current_project, "common", "ideologies")
+        os.makedirs(ideologies_dir, exist_ok=True)
+        
+        # Create ideologies file
+        ideologies_file = os.path.join(ideologies_dir, "00_ideologies.txt")
+        with open(ideologies_file, 'w', encoding='utf-8') as f:
+            f.write("ideologies = {\n\n}")
+        
+        # Create localization directory and file
+        localization_dir = os.path.join(project_manager.current_project, "localization")
+        os.makedirs(localization_dir, exist_ok=True)
+        
+        # FIXED: Use .yml extension
+        localization_file = os.path.join(localization_dir, "ideologies_l_english.yml")
+        with open(localization_file, 'w', encoding='utf-8') as f:
+            f.write('l_english:\n')
+
+        # Create GFX folder
+        gfx_dir = os.path.join(project_manager.current_project, "gfx", "interface", "ideologies")
+        os.makedirs(gfx_dir, exist_ok=True)
+        
+        return jsonify({'success': True, 'message': 'Ideologies files and folders created successfully!'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @main.route('/api/state_editor/remove_province_from_state', methods=['POST'])
 def remove_province_from_state():
     """Remove a province from a state"""
